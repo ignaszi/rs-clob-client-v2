@@ -23,7 +23,7 @@ use crate::ws::connection::ConnectionState;
 /// # Examples
 ///
 /// ```rust, no_run
-/// use polymarket_client_sdk::rtds::Client;
+/// use polymarket_client_sdk_v2::rtds::Client;
 /// use futures::StreamExt;
 ///
 /// #[tokio::main]
@@ -156,8 +156,8 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::rtds::Client;
-    /// use polymarket_client_sdk::ws::config::Config;
+    /// use polymarket_client_sdk_v2::rtds::Client;
+    /// use polymarket_client_sdk_v2::ws::config::Config;
     /// use futures::StreamExt;
     /// use tokio::pin;
     ///
@@ -245,7 +245,7 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::rtds::Client;
+    /// use polymarket_client_sdk_v2::rtds::Client;
     ///
     /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::default();

@@ -6,8 +6,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::types::address;
-//! use polymarket_client_sdk::data::{Client, types::request::PositionsRequest};
+//! use polymarket_client_sdk_v2::types::address;
+//! use polymarket_client_sdk_v2::data::{Client, types::request::PositionsRequest};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::default();
@@ -55,7 +55,7 @@ use crate::{Result, ToQueryParams as _};
 /// # Example
 ///
 /// ```no_run
-/// use polymarket_client_sdk::data::Client;
+/// use polymarket_client_sdk_v2::data::Client;
 ///
 /// // Create client with default endpoint
 /// let client = Client::default();

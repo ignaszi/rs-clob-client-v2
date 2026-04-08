@@ -8,9 +8,9 @@
 use std::str::FromStr as _;
 use std::time::Duration;
 
-use polymarket_client_sdk::auth::{LocalSigner, Signer as _};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::auth::{LocalSigner, Signer as _};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

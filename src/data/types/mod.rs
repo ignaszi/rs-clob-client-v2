@@ -263,8 +263,8 @@ pub enum LeaderboardOrderBy {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::types::MarketFilter;
-/// use polymarket_client_sdk::types::b256;
+/// use polymarket_client_sdk_v2::data::types::MarketFilter;
+/// use polymarket_client_sdk_v2::types::b256;
 ///
 /// // Filter by specific markets (condition IDs)
 /// let by_markets = MarketFilter::markets([b256!("dd22472e552920b8438158ea7238bfadfa4f736aa4cee91a6b86c39ead110917")]);
@@ -345,7 +345,7 @@ impl StdError for BoundedIntError {}
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::data::types::TradeFilter;
+/// use polymarket_client_sdk_v2::data::types::TradeFilter;
 /// use rust_decimal_macros::dec;
 ///
 /// // Filter trades with at least $100 USDC value

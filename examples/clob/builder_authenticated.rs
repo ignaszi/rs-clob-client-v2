@@ -23,11 +23,11 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::auth::builder::Config as BuilderConfig;
-use polymarket_client_sdk::clob::types::request::TradesRequest;
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::types::U256;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::auth::builder::Config as BuilderConfig;
+use polymarket_client_sdk_v2::clob::types::request::TradesRequest;
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::types::U256;
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;

@@ -4,7 +4,7 @@
 /// with special focus on hot trading paths: order placement, orderbook updates, trades,
 /// and cancellations.
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use polymarket_client_sdk::clob::types::response::{
+use polymarket_client_sdk_v2::clob::types::response::{
     ApiKeysResponse, BalanceAllowanceResponse, BanStatusResponse, CancelOrdersResponse,
     FeeRateResponse, LastTradePriceResponse, MarketResponse, MidpointResponse, NegRiskResponse,
     NotificationResponse, OpenOrderResponse, OrderBookSummaryResponse, PostOrderResponse,

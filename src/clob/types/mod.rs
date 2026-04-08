@@ -424,38 +424,6 @@ impl<'de> Deserialize<'de> for TickSize {
     }
 }
 
-sol! {
-    /// Alloy solidity type representing an order in the context of the Polymarket exchange
-    ///
-    /// <!-- The CLOB expects all `uint256` types, [`U256`], excluding `salt`, to be presented as a
-    /// string so we must serialize as Display, which for U256 is lower hex-encoded string.
-    /// -->
-    #[non_exhaustive]
-    #[serde_as]
-    #[derive(Serialize, Debug, Default, PartialEq)]
-    struct Order {
-        #[serde(serialize_with = "ser_salt")]
-        uint256 salt;
-        address maker;
-        address signer;
-        address taker;
-        #[serde_as(as = "DisplayFromStr")]
-        uint256 tokenId;
-        #[serde_as(as = "DisplayFromStr")]
-        uint256 makerAmount;
-        #[serde_as(as = "DisplayFromStr")]
-        uint256 takerAmount;
-        #[serde_as(as = "DisplayFromStr")]
-        uint256 expiration;
-        #[serde_as(as = "DisplayFromStr")]
-        uint256 nonce;
-        #[serde_as(as = "DisplayFromStr")]
-        uint256 feeRateBps;
-        uint8   side;
-        uint8   signatureType;
-    }
-}
-
 // CLOB expects salt as a JSON number. U256 as an integer will not fit as a JSON number. Since
 // we generated the salt as a u64 originally (see `salt_generator`), we can be very confident that
 // we can invert the conversion to U256 and return a u64 when serializing.
@@ -466,129 +434,64 @@ fn ser_salt<S: Serializer>(value: &U256, serializer: S) -> std::result::Result<S
     serializer.serialize_u64(v)
 }
 
-/// Order version for the exchange contract.
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum OrderVersion {
-    /// V1 (legacy) CTF Exchange order
-    V1,
-    /// V2 CTF Exchange order (default)
-    #[default]
-    V2,
-}
-
-/// V2 order types in a submodule to avoid name conflict with the V1 `Order` struct.
-/// The struct is named `Order` (not `OrderV2`) so that `alloy::sol!` generates the
-/// correct EIP-712 type hash: `Order(uint256 salt,address maker,...)`.
-pub mod v2 {
-    use super::*;
-
-    sol! {
-        /// V2 order struct for the Polymarket CTF Exchange V2.
-        ///
-        /// Compared to V1, this removes `taker`, `nonce`, `feeRateBps` and adds
-        /// `timestamp`, `metadata`, `builder`. Notably, `expiration` is NOT part of
-        /// the EIP-712 signed struct but is included in the JSON payload.
-        #[non_exhaustive]
-        #[serde_as]
-        #[derive(Serialize, Debug, Default, PartialEq)]
-        struct Order {
-            #[serde(serialize_with = "ser_salt")]
-            uint256 salt;
-            address maker;
-            address signer;
-            #[serde_as(as = "DisplayFromStr")]
-            uint256 tokenId;
-            #[serde_as(as = "DisplayFromStr")]
-            uint256 makerAmount;
-            #[serde_as(as = "DisplayFromStr")]
-            uint256 takerAmount;
-            uint8   side;
-            uint8   signatureType;
-            #[serde_as(as = "DisplayFromStr")]
-            uint256 timestamp;
-            bytes32 metadata;
-            bytes32 builder;
-        }
+sol! {
+    /// Order struct for the Polymarket CTF Exchange V2.
+    ///
+    /// `expiration` is NOT part of the EIP-712 signed struct but is included in the JSON payload.
+    #[non_exhaustive]
+    #[serde_as]
+    #[derive(Serialize, Debug, Default, PartialEq)]
+    struct Order {
+        #[serde(serialize_with = "ser_salt")]
+        uint256 salt;
+        address maker;
+        address signer;
+        #[serde_as(as = "DisplayFromStr")]
+        uint256 tokenId;
+        #[serde_as(as = "DisplayFromStr")]
+        uint256 makerAmount;
+        #[serde_as(as = "DisplayFromStr")]
+        uint256 takerAmount;
+        uint8   side;
+        uint8   signatureType;
+        #[serde_as(as = "DisplayFromStr")]
+        uint256 timestamp;
+        bytes32 metadata;
+        bytes32 builder;
     }
 }
 
-/// V2 order type alias for convenience.
-pub type OrderV2 = v2::Order;
-
-/// The order payload, either V1 or V2.
+/// The order payload.
 #[non_exhaustive]
-#[derive(Clone, Debug, PartialEq)]
-pub enum OrderPayload {
-    /// V1 (legacy) order
-    V1(Order),
-    /// V2 order. `expiration` is not part of the EIP-712 struct but is sent in JSON.
-    V2 { order: OrderV2, expiration: U256 },
-}
-
-impl Default for OrderPayload {
-    fn default() -> Self {
-        OrderPayload::V1(Order::default())
-    }
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct OrderPayload {
+    /// The order.
+    pub order: Order,
+    /// `expiration` is not part of the EIP-712 struct but is sent in JSON.
+    pub expiration: U256,
 }
 
 impl OrderPayload {
-    /// Returns a reference to the V1 order, or `None` if this is a V2 payload.
+    /// Creates a new `OrderPayload`.
     #[must_use]
-    pub fn as_v1(&self) -> Option<&Order> {
-        match self {
-            OrderPayload::V1(order) => Some(order),
-            OrderPayload::V2 { .. } => None,
-        }
-    }
-
-    /// Returns a reference to the V2 order and expiration, or `None` if this is a V1 payload.
-    #[must_use]
-    pub fn as_v2(&self) -> Option<(&OrderV2, &U256)> {
-        match self {
-            OrderPayload::V1(_) => None,
-            OrderPayload::V2 { order, expiration } => Some((order, expiration)),
-        }
+    pub fn new(order: Order, expiration: U256) -> Self {
+        Self { order, expiration }
     }
 }
 
 impl SignableOrder {
-    /// Convenience accessor: returns the inner V1 [`Order`] reference.
-    ///
-    /// # Panics
-    /// Panics if this is a V2 order.
+    /// Convenience accessor: returns the inner [`Order`] reference.
     #[must_use]
     pub fn order(&self) -> &Order {
-        self.payload.as_v1().expect("expected V1 order payload")
-    }
-
-    /// Convenience accessor: returns the inner V2 [`OrderV2`] reference and expiration.
-    ///
-    /// # Panics
-    /// Panics if this is a V1 order.
-    #[must_use]
-    pub fn order_v2(&self) -> (&OrderV2, &U256) {
-        self.payload.as_v2().expect("expected V2 order payload")
+        &self.payload.order
     }
 }
 
 impl SignedOrder {
-    /// Convenience accessor: returns the inner V1 [`Order`] reference.
-    ///
-    /// # Panics
-    /// Panics if this is a V2 order.
+    /// Convenience accessor: returns the inner [`Order`] reference.
     #[must_use]
     pub fn order(&self) -> &Order {
-        self.payload.as_v1().expect("expected V1 order payload")
-    }
-
-    /// Convenience accessor: returns the inner V2 [`OrderV2`] reference and expiration.
-    ///
-    /// # Panics
-    /// Panics if this is a V1 order.
-    #[must_use]
-    pub fn order_v2(&self) -> (&OrderV2, &U256) {
-        self.payload.as_v2().expect("expected V2 order payload")
+        &self.payload.order
     }
 }
 
@@ -612,41 +515,10 @@ pub struct SignedOrder {
     pub defer_exec: Option<bool>,
 }
 
-/// Helper struct for serializing V1 Order with signature injected.
+/// Helper struct for serializing Order with signature injected.
 #[serde_as]
 #[derive(Serialize)]
-struct OrderV1WithSignature<'order> {
-    #[serde(serialize_with = "ser_salt")]
-    salt: &'order U256,
-    maker: &'order alloy::primitives::Address,
-    signer: &'order alloy::primitives::Address,
-    taker: &'order alloy::primitives::Address,
-    #[serde_as(as = "DisplayFromStr")]
-    #[serde(rename = "tokenId")]
-    token_id: &'order U256,
-    #[serde_as(as = "DisplayFromStr")]
-    #[serde(rename = "makerAmount")]
-    maker_amount: &'order U256,
-    #[serde_as(as = "DisplayFromStr")]
-    #[serde(rename = "takerAmount")]
-    taker_amount: &'order U256,
-    #[serde_as(as = "DisplayFromStr")]
-    expiration: &'order U256,
-    #[serde_as(as = "DisplayFromStr")]
-    nonce: &'order U256,
-    #[serde_as(as = "DisplayFromStr")]
-    #[serde(rename = "feeRateBps")]
-    fee_rate_bps: &'order U256,
-    side: Side,
-    #[serde(rename = "signatureType")]
-    signature_type: u8,
-    signature: String,
-}
-
-/// Helper struct for serializing V2 Order with signature injected.
-#[serde_as]
-#[derive(Serialize)]
-struct OrderV2WithSignature<'order> {
+struct OrderWithSignature<'order> {
     #[serde(serialize_with = "ser_salt")]
     salt: &'order U256,
     maker: &'order alloy::primitives::Address,
@@ -684,46 +556,25 @@ impl Serialize for SignedOrder {
         }
         let mut st = serializer.serialize_struct("SignedOrder", field_count)?;
 
-        match &self.payload {
-            OrderPayload::V1(order) => {
-                let side = Side::try_from(order.side).map_err(S::Error::custom)?;
-                let order_with_sig = OrderV1WithSignature {
-                    salt: &order.salt,
-                    maker: &order.maker,
-                    signer: &order.signer,
-                    taker: &order.taker,
-                    token_id: &order.tokenId,
-                    maker_amount: &order.makerAmount,
-                    taker_amount: &order.takerAmount,
-                    expiration: &order.expiration,
-                    nonce: &order.nonce,
-                    fee_rate_bps: &order.feeRateBps,
-                    side,
-                    signature_type: order.signatureType,
-                    signature: self.signature.to_string(),
-                };
-                st.serialize_field("order", &order_with_sig)?;
-            }
-            OrderPayload::V2 { order, expiration } => {
-                let side = Side::try_from(order.side).map_err(S::Error::custom)?;
-                let order_with_sig = OrderV2WithSignature {
-                    salt: &order.salt,
-                    maker: &order.maker,
-                    signer: &order.signer,
-                    token_id: &order.tokenId,
-                    maker_amount: &order.makerAmount,
-                    taker_amount: &order.takerAmount,
-                    side,
-                    expiration,
-                    signature_type: order.signatureType,
-                    timestamp: &order.timestamp,
-                    metadata: &order.metadata,
-                    builder: &order.builder,
-                    signature: self.signature.to_string(),
-                };
-                st.serialize_field("order", &order_with_sig)?;
-            }
-        }
+        let order = &self.payload.order;
+        let expiration = &self.payload.expiration;
+        let side = Side::try_from(order.side).map_err(S::Error::custom)?;
+        let order_with_sig = OrderWithSignature {
+            salt: &order.salt,
+            maker: &order.maker,
+            signer: &order.signer,
+            token_id: &order.tokenId,
+            maker_amount: &order.makerAmount,
+            taker_amount: &order.takerAmount,
+            side,
+            expiration,
+            signature_type: order.signatureType,
+            timestamp: &order.timestamp,
+            metadata: &order.metadata,
+            builder: &order.builder,
+            signature: self.signature.to_string(),
+        };
+        st.serialize_field("order", &order_with_sig)?;
 
         st.serialize_field("orderType", &self.order_type)?;
         st.serialize_field("owner", &self.owner)?;
@@ -893,9 +744,9 @@ mod tests {
     }
 
     #[test]
-    fn signed_order_v1_serialization_omits_post_only_when_none() {
+    fn signed_order_serialization_omits_post_only_when_none() {
         let signed_order = SignedOrder {
-            payload: OrderPayload::V1(Order::default()),
+            payload: OrderPayload::default(),
             signature: Signature::new(U256::ZERO, U256::ZERO, false),
             order_type: OrderType::GTC,
             owner: ApiKey::nil(),
@@ -913,12 +764,9 @@ mod tests {
     }
 
     #[test]
-    fn signed_order_v2_serialization_includes_v2_fields() {
+    fn signed_order_serialization_includes_fields() {
         let signed_order = SignedOrder {
-            payload: OrderPayload::V2 {
-                order: OrderV2::default(),
-                expiration: U256::ZERO,
-            },
+            payload: OrderPayload::default(),
             signature: Signature::new(U256::ZERO, U256::ZERO, false),
             order_type: OrderType::GTC,
             owner: ApiKey::nil(),
@@ -936,7 +784,6 @@ mod tests {
         assert!(order_obj.contains_key("metadata"));
         assert!(order_obj.contains_key("builder"));
         assert!(order_obj.contains_key("expiration"));
-        // V2 should NOT have V1-only fields
         assert!(!order_obj.contains_key("taker"));
         assert!(!order_obj.contains_key("nonce"));
         assert!(!order_obj.contains_key("feeRateBps"));

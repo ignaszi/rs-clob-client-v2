@@ -7,10 +7,10 @@ use std::str::FromStr as _;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
 use httpmock::MockServer;
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::auth::{Credentials, ExposeSecret as _};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::error::{Kind, Synchronization, Validation};
+use polymarket_client_sdk_v2::POLYGON;
+use polymarket_client_sdk_v2::auth::{Credentials, ExposeSecret as _};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::error::{Kind, Synchronization, Validation};
 use reqwest::StatusCode;
 use serde_json::json;
 

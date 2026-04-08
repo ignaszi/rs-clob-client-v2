@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::gamma::{Client, types::request::EventsRequest};
+//! use polymarket_client_sdk_v2::gamma::{Client, types::request::EventsRequest};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Client::default();
@@ -67,7 +67,7 @@ const MAX_LIMIT: i32 = 500;
 /// # Example
 ///
 /// ```no_run
-/// use polymarket_client_sdk::gamma::Client;
+/// use polymarket_client_sdk_v2::gamma::Client;
 ///
 /// // Create client with default endpoint
 /// let client = Client::default();
@@ -516,7 +516,7 @@ impl Client {
     ///
     /// ```no_run
     /// use futures::StreamExt;
-    /// use polymarket_client_sdk::gamma::{Client, types::request::EventsRequest};
+    /// use polymarket_client_sdk_v2::gamma::{Client, types::request::EventsRequest};
     /// use tokio::pin;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {

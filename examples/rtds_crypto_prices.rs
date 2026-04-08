@@ -15,8 +15,8 @@
 use std::time::Duration;
 
 use futures::StreamExt as _;
-use polymarket_client_sdk::rtds::Client;
-use polymarket_client_sdk::rtds::types::response::CommentType;
+use polymarket_client_sdk_v2::rtds::Client;
+use polymarket_client_sdk_v2::rtds::types::response::CommentType;
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
 

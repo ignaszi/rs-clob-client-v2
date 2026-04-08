@@ -32,8 +32,8 @@ use crate::ws::connection::ConnectionState;
 /// ```rust, no_run
 /// use std::str::FromStr as _;
 ///
-/// use polymarket_client_sdk::clob::ws::Client;
-/// use polymarket_client_sdk::types::U256;
+/// use polymarket_client_sdk_v2::clob::ws::Client;
+/// use polymarket_client_sdk_v2::types::U256;
 /// use futures::StreamExt;
 ///
 /// #[tokio::main]

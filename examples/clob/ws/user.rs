@@ -25,9 +25,9 @@ use std::fs::File;
 use std::str::FromStr as _;
 
 use futures::StreamExt as _;
-use polymarket_client_sdk::auth::Credentials;
-use polymarket_client_sdk::clob::ws::{Client, WsMessage};
-use polymarket_client_sdk::types::{Address, B256};
+use polymarket_client_sdk_v2::auth::Credentials;
+use polymarket_client_sdk_v2::clob::ws::{Client, WsMessage};
+use polymarket_client_sdk_v2::types::{Address, B256};
 use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;

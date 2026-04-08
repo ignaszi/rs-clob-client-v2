@@ -52,9 +52,7 @@ use crate::clob::types::{
     CreateRfqRequestRequest, CreateRfqRequestResponse, RfqQuote, RfqQuotesRequest, RfqRequest,
     RfqRequestsRequest,
 };
-use crate::clob::types::{
-    OrderPayload, OrderVersion, SignableOrder, SignatureType, SignedOrder, TickSize,
-};
+use crate::clob::types::{SignableOrder, SignatureType, SignedOrder, TickSize};
 use crate::error::{Error, Kind as ErrorKind, Synchronization};
 use crate::types::Address;
 use crate::{
@@ -63,7 +61,6 @@ use crate::{
 };
 
 const ORDER_NAME: Option<Cow<'static, str>> = Some(Cow::Borrowed("Polymarket CTF Exchange"));
-const VERSION_V1: Option<Cow<'static, str>> = Some(Cow::Borrowed("1"));
 const VERSION_V2: Option<Cow<'static, str>> = Some(Cow::Borrowed("2"));
 
 const TERMINAL_CURSOR: &str = "LTE="; // base64("-1")
@@ -254,8 +251,8 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
 ///
 /// Create an unauthenticated client:
 /// ```rust,no_run
-/// use polymarket_client_sdk::Result;
-/// use polymarket_client_sdk::clob::{Client, Config};
+/// use polymarket_client_sdk_v2::Result;
+/// use polymarket_client_sdk_v2::clob::{Client, Config};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
@@ -274,8 +271,8 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
 ///
 /// use alloy::signers::Signer as _;
 /// use alloy::signers::local::LocalSigner;
-/// use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-/// use polymarket_client_sdk::clob::{Client, Config};
+/// use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
+/// use polymarket_client_sdk_v2::clob::{Client, Config};
 ///
 /// #[tokio::main]
 /// async fn main() -> anyhow::Result<()> {
@@ -495,7 +492,7 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::clob::{Client, Config};
+    /// # use polymarket_client_sdk_v2::clob::{Client, Config};
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("https://clob-v2.polymarket.com", Config::default())?;
     /// println!("Host: {}", client.host());
@@ -526,9 +523,9 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::clob::{Client, Config, types::TickSize};
+    /// # use polymarket_client_sdk_v2::clob::{Client, Config, types::TickSize};
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use polymarket_client_sdk::types::U256;
+    /// use polymarket_client_sdk_v2::types::U256;
     ///
     /// let client = Client::new("https://clob-v2.polymarket.com", Config::default())?;
     /// client.set_tick_size(U256::ZERO, TickSize::Hundredth);
@@ -547,9 +544,9 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::clob::{Client, Config};
+    /// # use polymarket_client_sdk_v2::clob::{Client, Config};
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use polymarket_client_sdk::types::U256;
+    /// use polymarket_client_sdk_v2::types::U256;
     ///
     /// let client = Client::new("https://clob-v2.polymarket.com", Config::default())?;
     /// client.set_neg_risk(U256::ZERO, true);
@@ -569,9 +566,9 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::clob::{Client, Config};
+    /// # use polymarket_client_sdk_v2::clob::{Client, Config};
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use polymarket_client_sdk::types::U256;
+    /// use polymarket_client_sdk_v2::types::U256;
     ///
     /// let client = Client::new("https://clob-v2.polymarket.com", Config::default())?;
     /// client.set_fee_rate_bps(U256::ZERO, 10); // 0.10% fee
@@ -901,8 +898,8 @@ impl<S: State> Client<S> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use polymarket_client_sdk::clob::{Client, Config};
-    /// use polymarket_client_sdk::error::{Kind, Geoblock};
+    /// use polymarket_client_sdk_v2::clob::{Client, Config};
+    /// use polymarket_client_sdk_v2::error::{Kind, Geoblock};
     ///
     /// #[tokio::main]
     /// async fn main() -> anyhow::Result<()> {
@@ -1197,7 +1194,7 @@ impl Client<Unauthenticated> {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::clob::{Client, Config};
+    /// use polymarket_client_sdk_v2::clob::{Client, Config};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::new("https://clob-v2.polymarket.com", Config::default())?;
@@ -1253,7 +1250,7 @@ impl Client<Unauthenticated> {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::clob::{Client, Config};
+    /// use polymarket_client_sdk_v2::clob::{Client, Config};
     /// use alloy::signers::local::LocalSigner;
     /// use std::str::FromStr;
     ///
@@ -1432,19 +1429,12 @@ impl<K: Kind> Client<Authenticated<K>> {
     }
 
     /// Creates an [`OrderBuilder<Limit, K>`] used to construct a limit order.
-    ///
-    /// Defaults to V2 orders. Use `.version(OrderVersion::V1)` on the returned builder
-    /// to create a V1 (legacy) order instead. V2 orders support `.metadata()`,
-    /// `.builder_code()`, and `.defer_exec()` fields.
     #[must_use]
     pub fn limit_order(&self) -> OrderBuilder<Limit, K> {
         self.order_builder()
     }
 
     /// Creates an [`OrderBuilder<Market, K>`] used to construct a market order.
-    ///
-    /// Defaults to V2 orders. Use `.version(OrderVersion::V1)` on the returned builder
-    /// to create a V1 (legacy) order instead.
     #[must_use]
     pub fn market_order(&self) -> OrderBuilder<Market, K> {
         self.order_builder()
@@ -1452,10 +1442,7 @@ impl<K: Kind> Client<Authenticated<K>> {
 
     /// Signs the provided [`SignableOrder`] using EIP-712 typed data signing.
     ///
-    /// Automatically selects the correct signing parameters based on the order version:
-    /// - **V1**: EIP-712 domain version `"1"`, V1 exchange contract address
-    /// - **V2**: EIP-712 domain version `"2"`, V2 exchange contract address
-    ///
+    /// Uses EIP-712 domain version `"2"` with the V2 exchange contract address.
     /// The exchange contract is resolved from the chain ID and neg-risk status of the token.
     #[expect(
         clippy::missing_panics_doc,
@@ -1476,48 +1463,27 @@ impl<K: Kind> Client<Authenticated<K>> {
             .chain_id()
             .expect("Validated not none in `authenticate`");
 
-        let signature = match &payload {
-            OrderPayload::V1(order) => {
-                let neg_risk = self.neg_risk(order.tokenId).await?.neg_risk;
-                let exchange_contract = contract_config(chain_id, neg_risk)
-                    .ok_or(Error::missing_contract_config(chain_id, neg_risk))?
-                    .exchange;
+        let order = &payload.order;
+        let neg_risk = self.neg_risk(order.tokenId).await?.neg_risk;
+        let config = contract_config(chain_id, neg_risk)
+            .ok_or(Error::missing_contract_config(chain_id, neg_risk))?;
+        let exchange_v2 = config.exchange_v2.ok_or_else(|| {
+            Error::validation(format!(
+                "No V2 exchange contract configured for chain_id={chain_id}, neg_risk={neg_risk}"
+            ))
+        })?;
 
-                let domain = Eip712Domain {
-                    name: ORDER_NAME,
-                    version: VERSION_V1,
-                    chain_id: Some(U256::from(chain_id)),
-                    verifying_contract: Some(exchange_contract),
-                    ..Eip712Domain::default()
-                };
-
-                signer
-                    .sign_hash(&order.eip712_signing_hash(&domain))
-                    .await?
-            }
-            OrderPayload::V2 { order, .. } => {
-                let neg_risk = self.neg_risk(order.tokenId).await?.neg_risk;
-                let config = contract_config(chain_id, neg_risk)
-                    .ok_or(Error::missing_contract_config(chain_id, neg_risk))?;
-                let exchange_v2 = config.exchange_v2.ok_or_else(|| {
-                    Error::validation(format!(
-                        "No V2 exchange contract configured for chain_id={chain_id}, neg_risk={neg_risk}"
-                    ))
-                })?;
-
-                let domain = Eip712Domain {
-                    name: ORDER_NAME,
-                    version: VERSION_V2,
-                    chain_id: Some(U256::from(chain_id)),
-                    verifying_contract: Some(exchange_v2),
-                    ..Eip712Domain::default()
-                };
-
-                signer
-                    .sign_hash(&order.eip712_signing_hash(&domain))
-                    .await?
-            }
+        let domain = Eip712Domain {
+            name: ORDER_NAME,
+            version: VERSION_V2,
+            chain_id: Some(U256::from(chain_id)),
+            verifying_contract: Some(exchange_v2),
+            ..Eip712Domain::default()
         };
+
+        let signature = signer
+            .sign_hash(&order.eip712_signing_hash(&domain))
+            .await?;
 
         Ok(SignedOrder {
             payload,
@@ -2178,12 +2144,9 @@ impl<K: Kind> Client<Authenticated<K>> {
             size: None,
             amount: None,
             side: None,
-            nonce: None,
             expiration: None,
-            taker: None,
             order_type: None,
             post_only: Some(false),
-            version: OrderVersion::default(),
             metadata: None,
             builder_code: None,
             defer_exec: None,

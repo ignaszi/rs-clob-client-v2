@@ -1,5 +1,5 @@
 [package]
-name = "polymarket-client-sdk"
+name = "polymarket_client_sdk_v2"
 description = "Polymarket CLOB (Central Limit Order Book) API client SDK"
 version = "0.4.4"
 authors = [
@@ -93,16 +93,6 @@ futures-util = "0.3.31"
 httpmock = "0.8.3"
 tokio = { version = "1.50.0", features = ["rt-multi-thread", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-[[example]]
-name = "buy_tokens_v2"
-path = "examples/clob/buy_tokens_v2.rs"
-required-features = ["clob"]
-
-[[example]]
-name = "cancel_orders_v2"
-path = "examples/clob/cancel_orders_v2.rs"
-required-features = ["clob"]
 
 [[example]]
 name = "async"

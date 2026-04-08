@@ -13,11 +13,11 @@
 use std::fs::File;
 
 use alloy::primitives::U256;
-use polymarket_client_sdk::bridge::Client;
-use polymarket_client_sdk::bridge::types::{
+use polymarket_client_sdk_v2::bridge::Client;
+use polymarket_client_sdk_v2::bridge::types::{
     DepositRequest, QuoteRequest, StatusRequest, WithdrawRequest,
 };
-use polymarket_client_sdk::types::address;
+use polymarket_client_sdk_v2::types::address;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;

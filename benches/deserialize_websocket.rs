@@ -3,8 +3,8 @@
 /// This module benchmarks ALL WebSocket message types with special focus on the MOST CRITICAL
 /// hot paths for live trading: orderbook updates, trade notifications, and order status updates.
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use polymarket_client_sdk::clob::ws::types::response::OrderBookLevel;
-use polymarket_client_sdk::clob::ws::{
+use polymarket_client_sdk_v2::clob::ws::types::response::OrderBookLevel;
+use polymarket_client_sdk_v2::clob::ws::{
     BestBidAsk, BookUpdate, LastTradePrice, MakerOrder, MarketResolved, MidpointUpdate, NewMarket,
     OrderMessage, PriceChange, TickSizeChange, TradeMessage, WsMessage,
 };

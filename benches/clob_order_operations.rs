@@ -10,12 +10,12 @@ use std::str::FromStr as _;
 use alloy::signers::Signer as _;
 use alloy::signers::local::PrivateKeySigner;
 use criterion::{Criterion, criterion_group, criterion_main};
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::auth::Normal;
-use polymarket_client_sdk::auth::state::Authenticated;
-use polymarket_client_sdk::clob::Client;
-use polymarket_client_sdk::clob::types::{OrderType, Side, TickSize};
-use polymarket_client_sdk::types::{Decimal, U256};
+use polymarket_client_sdk_v2::POLYGON;
+use polymarket_client_sdk_v2::auth::Normal;
+use polymarket_client_sdk_v2::auth::state::Authenticated;
+use polymarket_client_sdk_v2::clob::Client;
+use polymarket_client_sdk_v2::clob::types::{OrderType, Side, TickSize};
+use polymarket_client_sdk_v2::types::{Decimal, U256};
 use rust_decimal_macros::dec;
 
 const TOKEN_ID: &str =

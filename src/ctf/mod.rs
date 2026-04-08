@@ -16,9 +16,9 @@
 //! # Example
 //!
 //! ```ignore
-//! use polymarket_client_sdk::ctf::{Client, types::*};
-//! use polymarket_client_sdk::types::address;
-//! use polymarket_client_sdk::POLYGON;
+//! use polymarket_client_sdk_v2::ctf::{Client, types::*};
+//! use polymarket_client_sdk_v2::types::address;
+//! use polymarket_client_sdk_v2::POLYGON;
 //! use alloy::providers::ProviderBuilder;
 //! use alloy::primitives::{B256, U256};
 //!

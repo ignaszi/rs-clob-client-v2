@@ -3,11 +3,11 @@
 
 mod deposit {
     use httpmock::{Method::POST, MockServer};
-    use polymarket_client_sdk::bridge::{
+    use polymarket_client_sdk_v2::bridge::{
         Client,
         types::{DepositAddresses, DepositRequest, DepositResponse},
     };
-    use polymarket_client_sdk::types::address;
+    use polymarket_client_sdk_v2::types::address;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -117,7 +117,7 @@ mod deposit {
 
 mod supported_assets {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::bridge::{
+    use polymarket_client_sdk_v2::bridge::{
         Client,
         types::{SupportedAsset, SupportedAssetsResponse, Token},
     };
@@ -241,7 +241,7 @@ mod supported_assets {
 mod deposit_status {
     use alloy::primitives::{U256, address};
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::bridge::{
+    use polymarket_client_sdk_v2::bridge::{
         Client,
         types::{DepositTransaction, DepositTransactionStatus, StatusRequest, StatusResponse},
     };
@@ -320,7 +320,7 @@ mod deposit_status {
 mod quote {
     use alloy::primitives::U256;
     use httpmock::{Method::POST, MockServer};
-    use polymarket_client_sdk::bridge::{
+    use polymarket_client_sdk_v2::bridge::{
         Client,
         types::{EstimatedFeeBreakdown, QuoteRequest, QuoteResponse},
     };
@@ -411,11 +411,11 @@ mod quote {
 
 mod withdraw {
     use httpmock::{Method::POST, MockServer};
-    use polymarket_client_sdk::bridge::{
+    use polymarket_client_sdk_v2::bridge::{
         Client,
         types::{WithdrawRequest, WithdrawResponse, WithdrawalAddresses},
     };
-    use polymarket_client_sdk::types::address;
+    use polymarket_client_sdk_v2::types::address;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -472,7 +472,7 @@ mod withdraw {
 }
 
 mod client {
-    use polymarket_client_sdk::bridge::Client;
+    use polymarket_client_sdk_v2::bridge::Client;
 
     #[test]
     fn default_client_should_have_correct_host() {

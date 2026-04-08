@@ -15,18 +15,13 @@
 //! - **Authenticated**: Order placement/cancellation, balances, API keys, rewards
 //! - **Builder Authentication**: Special endpoints for market makers and builders
 //!
-//! ## Order Versions
+//! ## Orders
 //!
-//! The SDK supports both **V1** (legacy) and **V2** exchange contracts. **V2 is the default.**
-//!
-//! V2 orders differ from V1 in several ways:
-//! - **New fields**: `timestamp`, `metadata` (bytes32), `builder` (bytes32 for fee attribution)
-//! - **Removed fields**: `taker`, `nonce`, `feeRateBps` (not part of V2 on-chain struct)
-//! - **EIP-712 domain version**: `"2"` (V1 uses `"1"`)
-//! - **New signature type**: [`Poly1271`](types::SignatureType::Poly1271) for EIP-1271 smart contract wallets (V2 only)
-//! - **New field**: `deferExec` on order submission to defer execution
-//!
-//! Use `.version(OrderVersion::V1)` on the order builder to explicitly create V1 orders.
+//! This SDK uses the V2 CTF Exchange contract. Order fields include:
+//! `timestamp`, `metadata` (bytes32), `builder` (bytes32 for fee attribution).
+//! EIP-712 domain version is `"2"`.
+//! Supports [`Poly1271`](types::SignatureType::Poly1271) signature type for EIP-1271 smart contract wallets.
+//! Supports `deferExec` on order submission to defer execution.
 //!
 //! ## Public Endpoints (No Authentication Required)
 //!
@@ -86,9 +81,9 @@
 //! ```rust,no_run
 //! use std::str::FromStr as _;
 //!
-//! use polymarket_client_sdk::clob::{Client, Config};
-//! use polymarket_client_sdk::clob::types::request::MidpointRequest;
-//! use polymarket_client_sdk::types::U256;
+//! use polymarket_client_sdk_v2::clob::{Client, Config};
+//! use polymarket_client_sdk_v2::clob::types::request::MidpointRequest;
+//! use polymarket_client_sdk_v2::types::U256;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create an unauthenticated client
@@ -115,10 +110,10 @@
 //!
 //! use alloy::signers::Signer;
 //! use alloy::signers::local::LocalSigner;
-//! use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-//! use polymarket_client_sdk::clob::{Client, Config};
-//! use polymarket_client_sdk::clob::types::{Side, SignedOrder};
-//! use polymarket_client_sdk::types::{dec, Decimal, U256};
+//! use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
+//! use polymarket_client_sdk_v2::clob::{Client, Config};
+//! use polymarket_client_sdk_v2::clob::types::{Side, SignedOrder};
+//! use polymarket_client_sdk_v2::types::{dec, Decimal, U256};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create signer from private key

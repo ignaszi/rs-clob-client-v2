@@ -12,7 +12,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use polymarket_client_sdk::ctf::Client;
+//! use polymarket_client_sdk_v2::ctf::Client;
 //! use alloy::providers::ProviderBuilder;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {

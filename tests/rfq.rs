@@ -8,7 +8,7 @@ mod common;
 
 use alloy::primitives::Address;
 use httpmock::MockServer;
-use polymarket_client_sdk::clob::types::{
+use polymarket_client_sdk_v2::clob::types::{
     AcceptRfqQuoteRequest, ApproveRfqOrderRequest, CancelRfqQuoteRequest, CancelRfqRequestRequest,
     CreateRfqQuoteRequest, CreateRfqRequestRequest, RfqQuotesRequest, RfqRequestsRequest, Side,
     SignatureType,
@@ -23,8 +23,8 @@ use crate::common::{POLY_ADDRESS, create_authenticated};
 mod request {
     use std::str::FromStr as _;
 
-    use polymarket_client_sdk::clob::types::request::Asset;
-    use polymarket_client_sdk::types::U256;
+    use polymarket_client_sdk_v2::clob::types::request::Asset;
+    use polymarket_client_sdk_v2::types::U256;
 
     use super::*;
 
@@ -166,8 +166,8 @@ mod request {
 mod quote {
     use std::str::FromStr as _;
 
-    use polymarket_client_sdk::clob::types::request::Asset;
-    use polymarket_client_sdk::types::U256;
+    use polymarket_client_sdk_v2::clob::types::request::Asset;
+    use polymarket_client_sdk_v2::types::U256;
 
     use super::*;
 
@@ -371,9 +371,9 @@ mod execution {
 mod error_handling {
     use std::str::FromStr as _;
 
-    use polymarket_client_sdk::clob::types::request::Asset;
-    use polymarket_client_sdk::error::Kind;
-    use polymarket_client_sdk::types::U256;
+    use polymarket_client_sdk_v2::clob::types::request::Asset;
+    use polymarket_client_sdk_v2::error::Kind;
+    use polymarket_client_sdk_v2::types::U256;
 
     use super::*;
 

@@ -130,8 +130,8 @@ impl SplitPositionRequest {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::ctf::types::SplitPositionRequest;
-    /// # use polymarket_client_sdk::types::address;
+    /// # use polymarket_client_sdk_v2::ctf::types::SplitPositionRequest;
+    /// # use polymarket_client_sdk_v2::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = SplitPositionRequest::for_binary_market(
     ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC
@@ -159,8 +159,8 @@ impl MergePositionsRequest {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::ctf::types::MergePositionsRequest;
-    /// # use polymarket_client_sdk::types::address;
+    /// # use polymarket_client_sdk_v2::ctf::types::MergePositionsRequest;
+    /// # use polymarket_client_sdk_v2::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = MergePositionsRequest::for_binary_market(
     ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC
@@ -188,8 +188,8 @@ impl RedeemPositionsRequest {
     /// # Example
     ///
     /// ```no_run
-    /// # use polymarket_client_sdk::ctf::types::RedeemPositionsRequest;
-    /// # use polymarket_client_sdk::types::address;
+    /// # use polymarket_client_sdk_v2::ctf::types::RedeemPositionsRequest;
+    /// # use polymarket_client_sdk_v2::types::address;
     /// # use alloy::primitives::{B256, U256};
     /// let request = RedeemPositionsRequest::for_binary_market(
     ///     address!("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"), // USDC

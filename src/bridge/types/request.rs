@@ -10,8 +10,8 @@ use crate::types::Address;
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::types::address;
-/// use polymarket_client_sdk::bridge::types::DepositRequest;
+/// use polymarket_client_sdk_v2::types::address;
+/// use polymarket_client_sdk_v2::bridge::types::DepositRequest;
 ///
 /// let request = DepositRequest::builder()
 ///     .address(address!("56687bf447db6ffa42ffe2204a05edaa20f55839"))
@@ -31,7 +31,7 @@ pub struct DepositRequest {
 /// # Example
 ///
 /// ```
-/// use polymarket_client_sdk::bridge::types::StatusRequest;
+/// use polymarket_client_sdk_v2::bridge::types::StatusRequest;
 ///
 /// let request = StatusRequest::builder().address("0x9cb12Ec30568ab763ae5891ce4b8c5C96CeD72C9").build();
 /// ```

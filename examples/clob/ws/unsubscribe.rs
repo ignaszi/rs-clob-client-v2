@@ -25,8 +25,8 @@ use std::str::FromStr as _;
 use std::time::Duration;
 
 use futures::StreamExt as _;
-use polymarket_client_sdk::clob::ws::Client;
-use polymarket_client_sdk::types::U256;
+use polymarket_client_sdk_v2::clob::ws::Client;
+use polymarket_client_sdk_v2::types::U256;
 use tokio::time::timeout;
 use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;

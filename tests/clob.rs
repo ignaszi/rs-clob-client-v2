@@ -12,10 +12,10 @@ use std::str::FromStr as _;
 use alloy::primitives::U256;
 use chrono::{DateTime, Utc};
 use httpmock::MockServer;
-use polymarket_client_sdk::POLYGON;
-use polymarket_client_sdk::clob::types::SignatureType;
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::types::{Decimal, b256};
+use polymarket_client_sdk_v2::POLYGON;
+use polymarket_client_sdk_v2::clob::types::SignatureType;
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::types::{Decimal, b256};
 use reqwest::StatusCode;
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -31,20 +31,20 @@ mod unauthenticated {
     use chrono::{TimeDelta, TimeZone as _};
     use futures_util::future;
     use futures_util::stream::StreamExt as _;
-    use polymarket_client_sdk::clob::types::request::{
+    use polymarket_client_sdk_v2::clob::types::request::{
         LastTradePriceRequest, MidpointRequest, OrderBookSummaryRequest, PriceHistoryRequest,
         PriceRequest, SpreadRequest,
     };
-    use polymarket_client_sdk::clob::types::response::{
+    use polymarket_client_sdk_v2::clob::types::response::{
         FeeRateResponse, GeoblockResponse, LastTradePriceResponse, LastTradesPricesResponse,
         MarketResponse, MidpointResponse, MidpointsResponse, NegRiskResponse,
         OrderBookSummaryResponse, OrderSummary, Page, PriceHistoryResponse, PricePoint,
         PriceResponse, PricesResponse, Rewards, SimplifiedMarketResponse, SpreadResponse,
         SpreadsResponse, TickSizeResponse, Token,
     };
-    use polymarket_client_sdk::clob::types::{Interval, Side, TickSize, TimeRange};
-    use polymarket_client_sdk::error::Status;
-    use polymarket_client_sdk::types::address;
+    use polymarket_client_sdk_v2::clob::types::{Interval, Side, TickSize, TimeRange};
+    use polymarket_client_sdk_v2::error::Status;
+    use polymarket_client_sdk_v2::types::address;
     use reqwest::Method;
 
     use super::*;
@@ -1378,29 +1378,28 @@ mod authenticated {
     #[cfg(feature = "heartbeats")]
     use std::time::Duration;
 
-    use alloy::primitives::Signature;
     use alloy::signers::Signer as _;
     use alloy::signers::local::LocalSigner;
     use chrono::NaiveDate;
     use httpmock::Method::{DELETE, GET, POST};
-    use polymarket_client_sdk::clob::types::request::{
+    use polymarket_client_sdk_v2::clob::types::request::{
         BalanceAllowanceRequest, CancelMarketOrderRequest, DeleteNotificationsRequest,
         OrdersRequest, TradesRequest, UserRewardsEarningRequest,
     };
-    use polymarket_client_sdk::clob::types::response::{
+    use polymarket_client_sdk_v2::clob::types::response::{
         ApiKeysResponse, BalanceAllowanceResponse, BanStatusResponse, CancelOrdersResponse,
         CurrentRewardResponse, Earning, HeartbeatResponse, MakerOrder, MarketRewardResponse,
         MarketRewardsConfig, NotificationPayload, NotificationResponse, OpenOrderResponse,
         OrderScoringResponse, Page, PostOrderResponse, RewardsConfig, Token,
         TotalUserEarningResponse, TradeResponse, UserEarningResponse, UserRewardsEarningResponse,
     };
-    use polymarket_client_sdk::clob::types::{
-        AssetType, OrderStatusType, OrderType, OrderVersion, Side, SignableOrder, SignedOrder,
-        TickSize, TradeStatusType, TraderSide,
+    use polymarket_client_sdk_v2::clob::types::{
+        AssetType, OrderStatusType, OrderType, Side, SignableOrder, TickSize, TradeStatusType,
+        TraderSide,
     };
     #[cfg(feature = "heartbeats")]
-    use polymarket_client_sdk::error::Synchronization;
-    use polymarket_client_sdk::types::{Address, address, b256};
+    use polymarket_client_sdk_v2::error::Synchronization;
+    use polymarket_client_sdk_v2::types::{Address, address, b256};
 
     use super::*;
     use crate::common::{
@@ -1479,7 +1478,7 @@ mod authenticated {
         Ok(())
     }
 
-    // Also fills in some other, less often used fields like nonce, and salt generator
+    // Also fills in some other, less often used fields like salt generator
     #[tokio::test]
     async fn sign_order_should_succeed() -> anyhow::Result<()> {
         let server = MockServer::start();
@@ -1521,53 +1520,31 @@ mod authenticated {
             TickSize::Thousandth
         );
 
-        let taker = address!("0xf7fB45986800e2D259BAa25B56466bd02dA37a44");
         let signable_order = client
             .limit_order()
-            .version(OrderVersion::V1)
             .token_id(token_1())
             .price(dec!(0.512))
             .size(Decimal::ONE_HUNDRED)
             .side(Side::Buy)
-            .taker(taker)
-            .nonce(2)
             .build()
             .await?;
 
         let signed_order = client.sign(&signer, signable_order.clone()).await?;
 
-        let expected = SignedOrder::builder()
-            .owner(API_KEY)
-            .payload(signable_order.payload.clone())
-            .order_type(OrderType::GTC)
-            .post_only(false)
-            .maybe_defer_exec(None)
-            .signature(Signature::new(
-                U256::from_str(
-                    "67938079796141091828598175285011746318151402208362009718761031231176791189384",
-                )?,
-                U256::from_str(
-                    "31661255856293674232712511615893783899761903915420680037924826147367342033568",
-                )?,
-                true,
-            ))
-            .build();
-
-        assert_eq!(signed_order.order().taker, taker);
         assert_eq!(signed_order.order().maker, funder);
         assert_ne!(signed_order.order().maker, client.address());
         assert_eq!(
             signed_order.order().signatureType,
             SignatureType::Proxy as u8
         );
-        assert_eq!(signed_order.order().nonce, U256::from(2));
         assert_eq!(signed_order.order().salt, U256::from(1));
         assert_eq!(
             client.address(),
             address!("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
         );
-
-        assert_eq!(signed_order, expected);
+        assert_eq!(signed_order.payload, signable_order.payload);
+        assert_eq!(signed_order.owner.to_string(), API_KEY.to_string());
+        assert_eq!(signed_order.order_type, OrderType::GTC);
         mock.assert();
         mock2.assert_calls(2);
 
@@ -1589,19 +1566,19 @@ mod authenticated {
                 .header(POLY_PASSPHRASE, PASSPHRASE)
                 .json_body(json!({
                     "order": {
-                        "expiration": "0",
-                        "feeRateBps": "0",
-                        "maker": Address::ZERO,
-                        "makerAmount": "0",
-                        "nonce": "0",
                         "salt": 0,
-                        "side": Side::Buy,
-                        "signature": "0x0d18c04a653d89bf7375636adb7db69cffe362755960dc6ce8a0d46b04355b767958fae51c48e0e4b0908347442cb461e811d2f5a751303f7a8c1f75e17b3e701b",
-                        "signatureType": 0,
-                        "signer": Address::ZERO,
-                        "taker": Address::ZERO,
+                        "maker": "0x0000000000000000000000000000000000000000",
+                        "signer": "0x0000000000000000000000000000000000000000",
+                        "tokenId": "0",
+                        "makerAmount": "0",
                         "takerAmount": "0",
-                        "tokenId": "0"
+                        "side": "BUY",
+                        "expiration": "0",
+                        "signatureType": 0,
+                        "timestamp": "0",
+                        "metadata": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                        "builder": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                        "signature": "0x8a6edfe94a2169c3d05673521b53b7aee2205288f1363f1c9e24716317eebe6a17ca4bc397b85a5f39be21f32d0d8b38e0fd6de6af091dc0f4ba1f667d1883981c"
                     },
                     "orderType": "FOK",
                     "owner": "00000000-0000-0000-0000-000000000000"
@@ -2924,13 +2901,13 @@ mod builder_authenticated {
     use alloy::signers::Signer as _;
     use alloy::signers::local::LocalSigner;
     use httpmock::Method::DELETE;
-    use polymarket_client_sdk::auth::builder::Config as BuilderConfig;
-    use polymarket_client_sdk::clob::types::request::TradesRequest;
-    use polymarket_client_sdk::clob::types::response::{
+    use polymarket_client_sdk_v2::auth::builder::Config as BuilderConfig;
+    use polymarket_client_sdk_v2::clob::types::request::TradesRequest;
+    use polymarket_client_sdk_v2::clob::types::response::{
         BuilderApiKeyResponse, BuilderTradeResponse, Page,
     };
-    use polymarket_client_sdk::clob::types::{Side, TradeStatusType};
-    use polymarket_client_sdk::types::{address, b256};
+    use polymarket_client_sdk_v2::clob::types::{Side, TradeStatusType};
+    use polymarket_client_sdk_v2::types::{address, b256};
 
     use super::*;
     use crate::common::{

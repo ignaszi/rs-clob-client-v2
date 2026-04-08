@@ -30,13 +30,13 @@ use alloy::providers::ProviderBuilder;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
 use anyhow::Result;
-use polymarket_client_sdk::ctf::Client;
-use polymarket_client_sdk::ctf::types::{
+use polymarket_client_sdk_v2::ctf::Client;
+use polymarket_client_sdk_v2::ctf::types::{
     CollectionIdRequest, ConditionIdRequest, MergePositionsRequest, PositionIdRequest,
     RedeemPositionsRequest, SplitPositionRequest,
 };
-use polymarket_client_sdk::types::address;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::types::address;
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
 use tracing::{error, info};
 
 const RPC_URL: &str = "https://polygon-rpc.com";

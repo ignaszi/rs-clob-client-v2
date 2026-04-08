@@ -12,8 +12,7 @@ use crate::auth::state::Authenticated;
 use crate::clob::Client;
 use crate::clob::types::request::OrderBookSummaryRequest;
 use crate::clob::types::{
-    Amount, AmountInner, Order, OrderPayload, OrderType, OrderV2, OrderVersion, Side,
-    SignableOrder, SignatureType,
+    Amount, AmountInner, Order, OrderPayload, OrderType, Side, SignableOrder, SignatureType,
 };
 use crate::error::Error;
 use crate::types::{Address, Decimal};
@@ -34,11 +33,6 @@ pub struct Limit;
 pub struct Market;
 
 /// Used to create an order iteratively and ensure validity with respect to its order kind.
-///
-/// Defaults to V2 orders. Call `.version(OrderVersion::V1)` to create a V1 (legacy) order.
-///
-/// V2 orders support additional fields via `.metadata()`, `.builder_code()`, and `.defer_exec()`.
-/// V2 orders do not use `taker`, `nonce`, or `feeRateBps` — those are V1-only.
 #[derive(Debug)]
 pub struct OrderBuilder<OrderKind, K: AuthKind> {
     pub(crate) client: Client<Authenticated<K>>,
@@ -50,13 +44,10 @@ pub struct OrderBuilder<OrderKind, K: AuthKind> {
     pub(crate) size: Option<Decimal>,
     pub(crate) amount: Option<Amount>,
     pub(crate) side: Option<Side>,
-    pub(crate) nonce: Option<u64>,
     pub(crate) expiration: Option<DateTime<Utc>>,
-    pub(crate) taker: Option<Address>,
     pub(crate) order_type: Option<OrderType>,
     pub(crate) post_only: Option<bool>,
     pub(crate) funder: Option<Address>,
-    pub(crate) version: OrderVersion,
     pub(crate) metadata: Option<B256>,
     pub(crate) builder_code: Option<B256>,
     pub(crate) defer_exec: Option<bool>,
@@ -78,22 +69,9 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
         self
     }
 
-    /// Sets the nonce for this builder.
-    #[must_use]
-    pub fn nonce(mut self, nonce: u64) -> Self {
-        self.nonce = Some(nonce);
-        self
-    }
-
     #[must_use]
     pub fn expiration(mut self, expiration: DateTime<Utc>) -> Self {
         self.expiration = Some(expiration);
-        self
-    }
-
-    #[must_use]
-    pub fn taker(mut self, taker: Address) -> Self {
-        self.taker = Some(taker);
         self
     }
 
@@ -110,28 +88,21 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
         self
     }
 
-    /// Sets the order version (V1 or V2). Defaults to V2.
-    #[must_use]
-    pub fn version(mut self, version: OrderVersion) -> Self {
-        self.version = version;
-        self
-    }
-
-    /// Sets the metadata field (V2 orders only, bytes32). Defaults to zero.
+    /// Sets the metadata field (bytes32). Defaults to zero.
     #[must_use]
     pub fn metadata(mut self, metadata: B256) -> Self {
         self.metadata = Some(metadata);
         self
     }
 
-    /// Sets the builder code for fee attribution (V2 orders only, bytes32). Defaults to zero.
+    /// Sets the builder code for fee attribution (bytes32). Defaults to zero.
     #[must_use]
     pub fn builder_code(mut self, builder_code: B256) -> Self {
         self.builder_code = Some(builder_code);
         self
     }
 
-    /// Sets the `deferExec` flag (V2 orders only).
+    /// Sets the `deferExec` flag.
     #[must_use]
     pub fn defer_exec(mut self, defer_exec: bool) -> Self {
         self.defer_exec = Some(defer_exec);
@@ -243,12 +214,6 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             ));
         }
 
-        if self.version == OrderVersion::V1 && self.signature_type == SignatureType::Poly1271 {
-            return Err(Error::validation(
-                "Poly1271 signature type is only supported for V2 orders",
-            ));
-        }
-
         let (taker_amount, maker_amount) = match side {
             Side::Buy => (
                 size,
@@ -268,54 +233,30 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             )),
         )?);
 
-        let payload = match self.version {
-            OrderVersion::V1 => {
-                let fee_rate = self.client.fee_rate_bps(token_id).await?;
-                let nonce = self.nonce.unwrap_or(0);
-                let taker = self.taker.unwrap_or(Address::ZERO);
+        let timestamp_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_millis();
 
-                OrderPayload::V1(Order {
-                    salt: U256::from(salt),
-                    maker: self.funder.unwrap_or(self.signer),
-                    taker,
-                    tokenId: token_id,
-                    makerAmount: U256::from(to_fixed_u128(maker_amount)),
-                    takerAmount: U256::from(to_fixed_u128(taker_amount)),
-                    side: side as u8,
-                    feeRateBps: U256::from(fee_rate.base_fee),
-                    nonce: U256::from(nonce),
-                    signer: self.signer,
-                    expiration: expiration_u256,
-                    signatureType: self.signature_type as u8,
-                })
-            }
-            OrderVersion::V2 => {
-                let timestamp_ms = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("time went backwards")
-                    .as_millis();
-
-                OrderPayload::V2 {
-                    order: OrderV2 {
-                        salt: U256::from(salt),
-                        maker: self.funder.unwrap_or(self.signer),
-                        signer: self.signer,
-                        tokenId: token_id,
-                        makerAmount: U256::from(to_fixed_u128(maker_amount)),
-                        takerAmount: U256::from(to_fixed_u128(taker_amount)),
-                        side: side as u8,
-                        signatureType: self.signature_type as u8,
-                        timestamp: U256::from(timestamp_ms),
-                        metadata: self.metadata.unwrap_or(B256::ZERO),
-                        builder: self.builder_code.unwrap_or(B256::ZERO),
-                    },
-                    expiration: expiration_u256,
-                }
-            }
+        let payload = OrderPayload {
+            order: Order {
+                salt: U256::from(salt),
+                maker: self.funder.unwrap_or(self.signer),
+                signer: self.signer,
+                tokenId: token_id,
+                makerAmount: U256::from(to_fixed_u128(maker_amount)),
+                takerAmount: U256::from(to_fixed_u128(taker_amount)),
+                side: side as u8,
+                signatureType: self.signature_type as u8,
+                timestamp: U256::from(timestamp_ms),
+                metadata: self.metadata.unwrap_or(B256::ZERO),
+                builder: self.builder_code.unwrap_or(B256::ZERO),
+            },
+            expiration: expiration_u256,
         };
 
         #[cfg(feature = "tracing")]
-        tracing::debug!(token_id = %token_id, side = ?side, price = %price, size = %size, version = ?self.version, "limit order built");
+        tracing::debug!(token_id = %token_id, side = ?side, price = %price, size = %size, "limit order built");
 
         Ok(SignableOrder {
             payload,
@@ -437,12 +378,6 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             ));
         }
 
-        if self.version == OrderVersion::V1 && self.signature_type == SignatureType::Poly1271 {
-            return Err(Error::validation(
-                "Poly1271 signature type is only supported for V2 orders",
-            ));
-        }
-
         let price = match self.price {
             Some(price) => price,
             None => self.calculate_price(order_type.clone()).await?,
@@ -490,54 +425,30 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
 
         let salt = to_ieee_754_int((self.salt_generator)());
 
-        let payload = match self.version {
-            OrderVersion::V1 => {
-                let fee_rate = self.client.fee_rate_bps(token_id).await?;
-                let nonce = self.nonce.unwrap_or(0);
-                let taker = self.taker.unwrap_or(Address::ZERO);
+        let timestamp_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_millis();
 
-                OrderPayload::V1(Order {
-                    salt: U256::from(salt),
-                    maker: self.funder.unwrap_or(self.signer),
-                    taker,
-                    tokenId: token_id,
-                    makerAmount: U256::from(to_fixed_u128(maker_amount)),
-                    takerAmount: U256::from(to_fixed_u128(taker_amount)),
-                    side: side as u8,
-                    feeRateBps: U256::from(fee_rate.base_fee),
-                    nonce: U256::from(nonce),
-                    signer: self.signer,
-                    expiration: U256::ZERO,
-                    signatureType: self.signature_type as u8,
-                })
-            }
-            OrderVersion::V2 => {
-                let timestamp_ms = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("time went backwards")
-                    .as_millis();
-
-                OrderPayload::V2 {
-                    order: OrderV2 {
-                        salt: U256::from(salt),
-                        maker: self.funder.unwrap_or(self.signer),
-                        signer: self.signer,
-                        tokenId: token_id,
-                        makerAmount: U256::from(to_fixed_u128(maker_amount)),
-                        takerAmount: U256::from(to_fixed_u128(taker_amount)),
-                        side: side as u8,
-                        signatureType: self.signature_type as u8,
-                        timestamp: U256::from(timestamp_ms),
-                        metadata: self.metadata.unwrap_or(B256::ZERO),
-                        builder: self.builder_code.unwrap_or(B256::ZERO),
-                    },
-                    expiration: U256::ZERO,
-                }
-            }
+        let payload = OrderPayload {
+            order: Order {
+                salt: U256::from(salt),
+                maker: self.funder.unwrap_or(self.signer),
+                signer: self.signer,
+                tokenId: token_id,
+                makerAmount: U256::from(to_fixed_u128(maker_amount)),
+                takerAmount: U256::from(to_fixed_u128(taker_amount)),
+                side: side as u8,
+                signatureType: self.signature_type as u8,
+                timestamp: U256::from(timestamp_ms),
+                metadata: self.metadata.unwrap_or(B256::ZERO),
+                builder: self.builder_code.unwrap_or(B256::ZERO),
+            },
+            expiration: U256::ZERO,
         };
 
         #[cfg(feature = "tracing")]
-        tracing::debug!(token_id = %token_id, side = ?side, price = %price, amount = %amount.as_inner(), version = ?self.version, "market order built");
+        tracing::debug!(token_id = %token_id, side = ?side, price = %price, amount = %amount.as_inner(), "market order built");
 
         Ok(SignableOrder {
             payload,

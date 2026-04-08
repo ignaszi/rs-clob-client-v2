@@ -25,14 +25,14 @@ use std::str::FromStr as _;
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
 use chrono::{TimeDelta, Utc};
-use polymarket_client_sdk::clob::types::request::{
+use polymarket_client_sdk_v2::clob::types::request::{
     BalanceAllowanceRequest, OrdersRequest, TradesRequest, UpdateBalanceAllowanceRequest,
     UserRewardsEarningRequest,
 };
-use polymarket_client_sdk::clob::types::{Amount, OrderType, Side};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::types::{Decimal, U256};
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::clob::types::{Amount, OrderType, Side};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::types::{Decimal, U256};
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
 use rust_decimal_macros::dec;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;

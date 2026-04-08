@@ -1,6 +1,6 @@
 #![cfg(feature = "data")]
 
-use polymarket_client_sdk::types::{Address, B256, U256, address, b256};
+use polymarket_client_sdk_v2::types::{Address, B256, U256, address, b256};
 
 const TEST_USER: Address = address!("1234567890abcdef1234567890abcdef12345678");
 const TEST_CONDITION_ID: B256 =
@@ -16,7 +16,7 @@ fn test_condition_id() -> B256 {
 
 mod health {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::Client;
+    use polymarket_client_sdk_v2::data::Client;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -43,7 +43,7 @@ mod health {
 
 mod positions {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::PositionsRequest};
+    use polymarket_client_sdk_v2::data::{Client, types::request::PositionsRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -139,7 +139,7 @@ mod positions {
 
 mod trades {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::Side, types::request::TradesRequest};
+    use polymarket_client_sdk_v2::data::{Client, types::Side, types::request::TradesRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -196,7 +196,7 @@ mod trades {
 
 mod activity {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use polymarket_client_sdk_v2::data::{
         Client,
         types::request::ActivityRequest,
         types::{ActivityType, Side},
@@ -264,7 +264,7 @@ mod holders {
     use std::str::FromStr as _;
 
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::HoldersRequest};
+    use polymarket_client_sdk_v2::data::{Client, types::request::HoldersRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -336,7 +336,7 @@ mod holders {
 
 mod value {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::ValueRequest};
+    use polymarket_client_sdk_v2::data::{Client, types::request::ValueRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -375,7 +375,7 @@ mod value {
 
 mod closed_positions {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::ClosedPositionsRequest};
+    use polymarket_client_sdk_v2::data::{Client, types::request::ClosedPositionsRequest};
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -432,7 +432,7 @@ mod closed_positions {
 
 mod leaderboard {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use polymarket_client_sdk_v2::data::{
         Client,
         types::request::TraderLeaderboardRequest,
         types::{LeaderboardCategory, LeaderboardOrderBy, TimePeriod},
@@ -523,7 +523,7 @@ mod leaderboard {
 
 mod traded {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::TradedRequest};
+    use polymarket_client_sdk_v2::data::{Client, types::request::TradedRequest};
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -558,9 +558,9 @@ mod traded {
 
 mod open_interest {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::types::response::Market;
-    use polymarket_client_sdk::data::{Client, types::request::OpenInterestRequest};
-    use polymarket_client_sdk::types::b256;
+    use polymarket_client_sdk_v2::data::types::response::Market;
+    use polymarket_client_sdk_v2::data::{Client, types::request::OpenInterestRequest};
+    use polymarket_client_sdk_v2::types::b256;
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -653,9 +653,9 @@ mod open_interest {
 
 mod live_volume {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::types::response::Market;
-    use polymarket_client_sdk::data::{Client, types::request::LiveVolumeRequest};
-    use polymarket_client_sdk::types::b256;
+    use polymarket_client_sdk_v2::data::types::response::Market;
+    use polymarket_client_sdk_v2::data::{Client, types::request::LiveVolumeRequest};
+    use polymarket_client_sdk_v2::types::b256;
     use reqwest::StatusCode;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -715,7 +715,7 @@ mod live_volume {
 
 mod builder_leaderboard {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use polymarket_client_sdk_v2::data::{
         Client, types::TimePeriod, types::request::BuilderLeaderboardRequest,
     };
     use reqwest::StatusCode;
@@ -795,7 +795,7 @@ mod builder_volume {
 
     use chrono::{DateTime, Utc};
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{
+    use polymarket_client_sdk_v2::data::{
         Client, types::TimePeriod, types::request::BuilderVolumeRequest,
     };
     use reqwest::StatusCode;
@@ -875,8 +875,8 @@ mod builder_volume {
 
 mod error_handling {
     use httpmock::{Method::GET, MockServer};
-    use polymarket_client_sdk::data::{Client, types::request::PositionsRequest};
-    use polymarket_client_sdk::error::Kind;
+    use polymarket_client_sdk_v2::data::{Client, types::request::PositionsRequest};
+    use polymarket_client_sdk_v2::error::Kind;
     use reqwest::StatusCode;
     use serde_json::json;
 
@@ -955,7 +955,7 @@ mod error_handling {
 }
 
 mod client {
-    use polymarket_client_sdk::data::Client;
+    use polymarket_client_sdk_v2::data::Client;
 
     #[test]
     fn client_default_should_succeed() {
@@ -977,8 +977,8 @@ mod client {
 }
 
 mod types {
-    use polymarket_client_sdk::ToQueryParams as _;
-    use polymarket_client_sdk::data::{
+    use polymarket_client_sdk_v2::ToQueryParams as _;
+    use polymarket_client_sdk_v2::data::{
         types::request::{
             ActivityRequest, BuilderLeaderboardRequest, HoldersRequest, LiveVolumeRequest,
             PositionsRequest, TradedRequest, TraderLeaderboardRequest, TradesRequest,
@@ -1190,7 +1190,7 @@ mod types {
 
     #[test]
     fn all_activity_types_display() {
-        use polymarket_client_sdk::data::types::ActivityType;
+        use polymarket_client_sdk_v2::data::types::ActivityType;
         assert_eq!(ActivityType::Split.to_string(), "SPLIT");
         assert_eq!(ActivityType::Merge.to_string(), "MERGE");
         assert_eq!(ActivityType::Redeem.to_string(), "REDEEM");
@@ -1241,7 +1241,7 @@ mod types {
 }
 
 mod error_display {
-    use polymarket_client_sdk::data::{types::TradeFilter, types::request::PositionsRequest};
+    use polymarket_client_sdk_v2::data::{types::TradeFilter, types::request::PositionsRequest};
     use rust_decimal_macros::dec;
 
     use super::address;
@@ -1266,8 +1266,8 @@ mod error_display {
 }
 
 mod request_query_string_extended {
-    use polymarket_client_sdk::ToQueryParams as _;
-    use polymarket_client_sdk::data::types::{
+    use polymarket_client_sdk_v2::ToQueryParams as _;
+    use polymarket_client_sdk_v2::data::types::{
         ActivitySortBy, ClosedPositionSortBy, MarketFilter, PositionSortBy, Side, SortDirection,
         TradeFilter,
         request::{
@@ -1478,7 +1478,7 @@ mod request_query_string_extended {
 
     #[test]
     fn closed_position_sort_by_variants() {
-        use polymarket_client_sdk::data::types::ClosedPositionSortBy;
+        use polymarket_client_sdk_v2::data::types::ClosedPositionSortBy;
         assert_eq!(ClosedPositionSortBy::Title.to_string(), "TITLE");
         assert_eq!(ClosedPositionSortBy::Price.to_string(), "PRICE");
         assert_eq!(ClosedPositionSortBy::AvgPrice.to_string(), "AVGPRICE");
@@ -1493,7 +1493,7 @@ mod request_query_string_extended {
 
     #[test]
     fn filter_type_display() {
-        use polymarket_client_sdk::data::types::FilterType;
+        use polymarket_client_sdk_v2::data::types::FilterType;
         assert_eq!(FilterType::Cash.to_string(), "CASH");
         assert_eq!(FilterType::Tokens.to_string(), "TOKENS");
     }

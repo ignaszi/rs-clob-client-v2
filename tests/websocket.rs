@@ -12,9 +12,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt as _, StreamExt as _};
-use polymarket_client_sdk::clob::ws::{Client, WsMessage};
-use polymarket_client_sdk::types::{Address, U256, b256};
-use polymarket_client_sdk::ws::config::Config;
+use polymarket_client_sdk_v2::clob::ws::{Client, WsMessage};
+use polymarket_client_sdk_v2::types::{Address, U256, b256};
+use polymarket_client_sdk_v2::ws::config::Config;
 use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc};
@@ -118,7 +118,7 @@ impl MockWsServer {
 pub mod payloads {
     use std::str::FromStr as _;
 
-    use polymarket_client_sdk::types::{B256, U256, b256};
+    use polymarket_client_sdk_v2::types::{B256, U256, b256};
     use serde_json::{Value, json};
 
     pub const ASSET_ID_STR: &str =
@@ -460,9 +460,11 @@ mod market_channel {
 }
 
 mod user_channel {
-    use polymarket_client_sdk::auth::Credentials;
-    use polymarket_client_sdk::clob::types::Side;
-    use polymarket_client_sdk::clob::ws::types::response::{OrderMessageType, TradeMessageStatus};
+    use polymarket_client_sdk_v2::auth::Credentials;
+    use polymarket_client_sdk_v2::clob::types::Side;
+    use polymarket_client_sdk_v2::clob::ws::types::response::{
+        OrderMessageType, TradeMessageStatus,
+    };
     use rust_decimal_macros::dec;
     use tokio::time::sleep;
 
@@ -1273,7 +1275,7 @@ mod unsubscribe {
 }
 
 mod client_state {
-    use polymarket_client_sdk::clob::ws::ChannelType;
+    use polymarket_client_sdk_v2::clob::ws::ChannelType;
 
     use super::*;
 
@@ -1642,8 +1644,8 @@ mod custom_features {
 mod message_parsing {
     use std::str::FromStr as _;
 
-    use polymarket_client_sdk::clob::types::Side;
-    use polymarket_client_sdk::clob::ws::{LastTradePrice, TickSizeChange};
+    use polymarket_client_sdk_v2::clob::types::Side;
+    use polymarket_client_sdk_v2::clob::ws::{LastTradePrice, TickSizeChange};
     use rust_decimal_macros::dec;
 
     use super::*;

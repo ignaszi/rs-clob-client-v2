@@ -18,8 +18,8 @@ use crate::Result;
 /// # Example
 ///
 /// ```no_run
-/// use polymarket_client_sdk::types::address;
-/// use polymarket_client_sdk::bridge::{Client, types::DepositRequest};
+/// use polymarket_client_sdk_v2::types::address;
+/// use polymarket_client_sdk_v2::bridge::{Client, types::DepositRequest};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let client = Client::default();
@@ -88,8 +88,8 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::types::address;
-    /// use polymarket_client_sdk::bridge::{Client, types::DepositRequest};
+    /// use polymarket_client_sdk_v2::types::address;
+    /// use polymarket_client_sdk_v2::bridge::{Client, types::DepositRequest};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::default();
@@ -134,7 +134,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::bridge::Client;
+    /// use polymarket_client_sdk_v2::bridge::Client;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::default();
@@ -166,7 +166,7 @@ impl Client {
     /// # Example
     ///
     /// ```no_run
-    /// use polymarket_client_sdk::bridge::{Client, types::StatusRequest};
+    /// use polymarket_client_sdk_v2::bridge::{Client, types::StatusRequest};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let client = Client::default();

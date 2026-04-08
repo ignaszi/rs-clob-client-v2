@@ -16,7 +16,7 @@
 use std::fs::File;
 
 use futures::StreamExt as _;
-use polymarket_client_sdk::gamma::{
+use polymarket_client_sdk_v2::gamma::{
     Client,
     types::request::{EventsRequest, MarketsRequest},
 };

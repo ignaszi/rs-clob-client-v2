@@ -16,7 +16,7 @@
 //! All request types use the builder pattern via the [`bon`](https://docs.rs/bon) crate:
 //!
 //! ```
-//! use polymarket_client_sdk::gamma::types::request::{EventsRequest, MarketsRequest};
+//! use polymarket_client_sdk_v2::gamma::types::request::{EventsRequest, MarketsRequest};
 //!
 //! // Simple request with defaults
 //! let events = EventsRequest::builder().build();

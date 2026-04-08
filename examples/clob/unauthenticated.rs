@@ -18,12 +18,12 @@ use std::collections::HashMap;
 use std::fs::File;
 
 use futures_util::StreamExt as _;
-use polymarket_client_sdk::clob::types::Side;
-use polymarket_client_sdk::clob::types::request::{
+use polymarket_client_sdk_v2::clob::types::Side;
+use polymarket_client_sdk_v2::clob::types::request::{
     LastTradePriceRequest, MidpointRequest, OrderBookSummaryRequest, PriceRequest, SpreadRequest,
 };
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::types::{B256, Decimal, U256};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::types::{B256, Decimal, U256};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;

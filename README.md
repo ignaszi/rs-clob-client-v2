@@ -2,7 +2,7 @@
 
 # Polymarket Rust Client
 
-[![Crates.io](https://img.shields.io/crates/v/polymarket-client-sdk.svg)](https://crates.io/crates/polymarket-client-sdk)
+[![Crates.io](https://img.shields.io/crates/v/polymarket_client_sdk_v2.svg)](https://crates.io/crates/polymarket_client_sdk_v2)
 [![CI](https://github.com/Polymarket/rs-clob-client/actions/workflows/ci.yml/badge.svg)](https://github.com/Polymarket/rs-clob-client/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/Polymarket/rs-clob-client/graph/badge.svg?token=FW1BYWWFJ2)](https://codecov.io/gh/Polymarket/rs-clob-client)
 
@@ -48,13 +48,13 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polymarket-client-sdk = "0.4"
+polymarket_client_sdk_v2 = "0.4"
 ```
 
 or
 
 ```bash
-cargo add polymarket-client-sdk
+cargo add polymarket_client_sdk_v2
 ```
 
 Then run any of the examples
@@ -83,7 +83,7 @@ Enable features in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polymarket-client-sdk = { version = "0.3", features = ["ws", "data"] }
+polymarket_client_sdk_v2 = { version = "0.3", features = ["ws", "data"] }
 ```
 
 ## Re-exported Types
@@ -93,7 +93,7 @@ This SDK re-exports commonly used types from external crates so you don't need t
 ### From `types` module
 
 ```rust
-use polymarket_client_sdk::types::{
+use polymarket_client_sdk_v2::types::{
     Address, ChainId, Signature, address,  // from alloy::primitives
     DateTime, NaiveDate, Utc,              // from chrono
     Decimal, dec,                          // from rust_decimal + rust_decimal_macros
@@ -103,7 +103,7 @@ use polymarket_client_sdk::types::{
 ### From `auth` module
 
 ```rust
-use polymarket_client_sdk::auth::{
+use polymarket_client_sdk_v2::auth::{
     LocalSigner, Signer,          // from alloy::signers (LocalSigner + trait)
     Uuid, ApiKey,                 // from uuid (ApiKey = Uuid)
     SecretString, ExposeSecret,   // from secrecy
@@ -114,7 +114,7 @@ use polymarket_client_sdk::auth::{
 ### From `error` module
 
 ```rust
-use polymarket_client_sdk::error::{
+use polymarket_client_sdk_v2::error::{
     StatusCode, Method,           // from reqwest (for error inspection)
 };
 ```
@@ -129,7 +129,7 @@ See `examples/` for the complete set. Below are hand-picked examples for common 
 
 #### Unauthenticated client (read-only)
 ```rust,ignore
-use polymarket_client_sdk::clob::Client;
+use polymarket_client_sdk_v2::clob::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -154,8 +154,8 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::clob::{Client, Config};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -204,7 +204,7 @@ let client = Client::new("https://clob-v2.polymarket.com", Config::default())?
 You can also derive these addresses manually:
 
 ```rust,ignore
-use polymarket_client_sdk::{derive_safe_wallet, derive_proxy_wallet, POLYGON};
+use polymarket_client_sdk_v2::{derive_safe_wallet, derive_proxy_wallet, POLYGON};
 
 // For browser wallet users (GnosisSafe)
 let safe_address = derive_safe_wallet(signer.address(), POLYGON);
@@ -236,10 +236,10 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::types::{Amount, OrderType, Side};
-use polymarket_client_sdk::types::Decimal;
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::clob::types::{Amount, OrderType, Side};
+use polymarket_client_sdk_v2::types::Decimal;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -273,10 +273,10 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::types::Side;
-use polymarket_client_sdk::types::Decimal;
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::clob::types::Side;
+use polymarket_client_sdk_v2::types::Decimal;
 use rust_decimal_macros::dec;
 
 #[tokio::main]
@@ -312,7 +312,7 @@ domain version is `"2"` for V2 orders.
 
 ```rust,ignore
 use alloy::primitives::B256;
-use polymarket_client_sdk::clob::types::OrderVersion;
+use polymarket_client_sdk_v2::clob::types::OrderVersion;
 
 // V2 order (default) — with metadata and builder attribution
 let order = client
@@ -348,11 +348,11 @@ use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk::auth::builder::Config as BuilderConfig;
-use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::types::SignatureType;
-use polymarket_client_sdk::clob::types::request::TradesRequest;
+use polymarket_client_sdk_v2::auth::builder::Config as BuilderConfig;
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
+use polymarket_client_sdk_v2::clob::{Client, Config};
+use polymarket_client_sdk_v2::clob::types::SignatureType;
+use polymarket_client_sdk_v2::clob::types::request::TradesRequest;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -386,12 +386,12 @@ async fn main() -> anyhow::Result<()> {
 Real-time orderbook and user event streaming. Requires the `ws` feature.
 
 ```toml
-polymarket-client-sdk = { version = "0.3", features = ["ws"] }
+polymarket_client_sdk_v2 = { version = "0.3", features = ["ws"] }
 ```
 
 ```rust,ignore
 use futures::StreamExt as _;
-use polymarket_client_sdk::clob::ws::Client;
+use polymarket_client_sdk_v2::clob::ws::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -426,9 +426,9 @@ See [`examples/clob/ws/`](examples/clob/ws/) for more WebSocket examples includi
 Trading analytics, positions, and leaderboards. Requires the `data` feature.
 
 ```rust,ignore
-use polymarket_client_sdk::data::Client;
-use polymarket_client_sdk::data::types::request::PositionsRequest;
-use polymarket_client_sdk::types::address;
+use polymarket_client_sdk_v2::data::Client;
+use polymarket_client_sdk_v2::data::types::request::PositionsRequest;
+use polymarket_client_sdk_v2::types::address;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -448,8 +448,8 @@ See [`examples/data.rs`](examples/data.rs) for trades, leaderboards, activity, a
 Market and event discovery. Requires the `gamma` feature.
 
 ```rust,ignore
-use polymarket_client_sdk::gamma::Client;
-use polymarket_client_sdk::gamma::types::request::{EventsRequest, SearchRequest};
+use polymarket_client_sdk_v2::gamma::Client;
+use polymarket_client_sdk_v2::gamma::types::request::{EventsRequest, SearchRequest};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -474,9 +474,9 @@ See [`examples/gamma.rs`](examples/gamma/client.rs) for tags, series, comments, 
 Cross-chain deposits from EVM chains, Solana, and Bitcoin. Requires the `bridge` feature.
 
 ```rust,ignore
-use polymarket_client_sdk::bridge::Client;
-use polymarket_client_sdk::bridge::types::DepositRequest;
-use polymarket_client_sdk::types::address;
+use polymarket_client_sdk_v2::bridge::Client;
+use polymarket_client_sdk_v2::bridge::types::DepositRequest;
+use polymarket_client_sdk_v2::types::address;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

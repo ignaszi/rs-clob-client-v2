@@ -19,7 +19,7 @@
 //! # Example
 //!
 //! ```rust, no_run
-//! use polymarket_client_sdk::rtds::Client;
+//! use polymarket_client_sdk_v2::rtds::Client;
 //! use futures::StreamExt;
 //!
 //! #[tokio::main]
