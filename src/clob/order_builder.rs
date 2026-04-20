@@ -339,10 +339,10 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             ));
         }
 
-        let (levels, amount) = match side {
-            Side::Buy => (book.asks, amount.0),
+        let (levels, amount_inner) = match side {
+            Side::Buy => (&book.asks, amount.0),
             Side::Sell => match amount.0 {
-                a @ AmountInner::Shares(_) => (book.bids, a),
+                a @ AmountInner::Shares(_) => (&book.bids, a),
                 AmountInner::Usdc(_) => {
                     return Err(Error::validation(
                         "Sell Orders must specify their `amount`s in shares",
@@ -353,27 +353,30 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             side => return Err(Error::validation(format!("Invalid side: {side}"))),
         };
 
-        let first = levels.first().ok_or(Error::validation(format!(
-            "No opposing orders for {token_id} which means there is no market price"
-        )))?;
-
-        let mut sum = Decimal::ZERO;
-        let cutoff_price = levels.iter().rev().find_map(|level| {
-            match amount {
-                AmountInner::Usdc(_) => sum += level.size * level.price,
-                AmountInner::Shares(_) => sum += level.size,
-            }
-            (sum >= amount.as_inner()).then_some(level.price)
-        });
-
-        match cutoff_price {
-            Some(price) => Ok(price),
-            None if matches!(order_type, OrderType::FOK) => Err(Error::validation(format!(
-                "Insufficient liquidity to fill order for {token_id} at {}",
-                amount.as_inner()
-            ))),
-            None => Ok(first.price),
+        if levels.is_empty() {
+            return Err(Error::validation(format!(
+                "No opposing orders for {token_id} which means there is no market price"
+            )));
         }
+
+        let target = amount_inner.as_inner();
+        let cutoff_price = match amount_inner {
+            AmountInner::Usdc(_) => super::utilities::walk_levels(
+                levels,
+                target,
+                |l| l.size * l.price,
+                &order_type,
+            ),
+            AmountInner::Shares(_) => {
+                super::utilities::walk_levels(levels, target, |l| l.size, &order_type)
+            }
+        };
+
+        cutoff_price.ok_or_else(|| {
+            Error::validation(format!(
+                "Insufficient liquidity to fill order for {token_id} at {target}"
+            ))
+        })
     }
 
     /// Validates and transforms this market builder into a [`SignableOrder`]

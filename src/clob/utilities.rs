@@ -9,11 +9,43 @@ use sha1::Digest as _;
 use super::types::response::{OrderBookSummaryResponse, OrderSummary};
 use super::types::{OrderType, Side, TickSize};
 
+/// Walks orderbook levels in reverse (worst-to-best), accumulating via `accumulate`,
+/// and returns the cutoff price where cumulative ≥ `target`.
+///
+/// If no level satisfies the target:
+/// - Returns `None` for [`OrderType::FOK`]
+/// - Returns the best available price (first level) for other order types
+///
+/// Returns `None` for empty `levels`.
+pub(crate) fn walk_levels<F: Fn(&OrderSummary) -> Decimal>(
+    levels: &[OrderSummary],
+    target: Decimal,
+    accumulate: F,
+    order_type: &OrderType,
+) -> Option<Decimal> {
+    if levels.is_empty() {
+        return None;
+    }
+
+    let mut total = Decimal::ZERO;
+    for level in levels.iter().rev() {
+        total += accumulate(level);
+        if total >= target {
+            return Some(level.price);
+        }
+    }
+
+    if *order_type == OrderType::FOK {
+        return None;
+    }
+
+    Some(levels[0].price)
+}
+
 /// Walks the orderbook to calculate the effective fill price for a given amount.
 ///
-/// Iterates positions in reverse order (worst-to-best price levels).
-/// For BUY, accumulates cumulative USDC cost (`size * price`).
-/// For SELL, accumulates cumulative token size.
+/// For BUY, walks asks and accumulates cumulative USDC cost (`size * price`).
+/// For SELL, walks bids and accumulates cumulative token size.
 /// Returns `None` for [`OrderType::FOK`] if insufficient liquidity,
 /// or the best available price for other order types.
 #[must_use]
@@ -23,33 +55,11 @@ pub fn calculate_market_price(
     amount: Decimal,
     order_type: &OrderType,
 ) -> Option<Decimal> {
-    let positions: &[OrderSummary] = match side {
-        Side::Buy => &orderbook.asks,
-        Side::Sell => &orderbook.bids,
-        Side::Unknown => return None,
-    };
-
-    if positions.is_empty() {
-        return None;
+    match side {
+        Side::Buy => walk_levels(&orderbook.asks, amount, |l| l.size * l.price, order_type),
+        Side::Sell => walk_levels(&orderbook.bids, amount, |l| l.size, order_type),
+        Side::Unknown => None,
     }
-
-    let mut total = Decimal::ZERO;
-    for p in positions.iter().rev() {
-        match side {
-            Side::Buy => total += p.size * p.price,
-            Side::Sell => total += p.size,
-            Side::Unknown => return None,
-        }
-        if total >= amount {
-            return Some(p.price);
-        }
-    }
-
-    if *order_type == OrderType::FOK {
-        return None;
-    }
-
-    Some(positions[0].price)
 }
 
 /// Generates a server-compatible SHA1 hash of an orderbook snapshot.
@@ -145,7 +155,7 @@ pub fn adjust_market_buy_amount(
     let platform_fee = amount / price * platform_fee_rate;
     let total_cost = amount + platform_fee + amount * builder_taker_fee_rate;
 
-    if user_usdc_balance <= total_cost {
+    if user_usdc_balance < total_cost {
         let divisor = Decimal::ONE + platform_fee_rate / price + builder_taker_fee_rate;
         user_usdc_balance / divisor
     } else {
