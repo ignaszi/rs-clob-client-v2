@@ -4429,9 +4429,10 @@ mod v1 {
 
         #[tokio::test]
         async fn v1_sign_uses_v1_domain_and_exchange() -> anyhow::Result<()> {
+            use std::borrow::Cow;
+
             use alloy::dyn_abi::Eip712Domain;
             use alloy::sol_types::SolStruct as _;
-            use std::borrow::Cow;
 
             let server = MockServer::start();
             let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
@@ -4489,9 +4490,10 @@ mod v1 {
         #[tokio::test]
         async fn v1_sign_rejects_if_signature_types_diverge() -> anyhow::Result<()> {
             // Sanity: a signature produced against the V2 domain must NOT verify as V1.
+            use std::borrow::Cow;
+
             use alloy::dyn_abi::Eip712Domain;
             use alloy::sol_types::SolStruct as _;
-            use std::borrow::Cow;
 
             let server = MockServer::start();
             let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
@@ -4605,9 +4607,10 @@ mod v1 {
 
         #[tokio::test]
         async fn v1_neg_risk_signs_against_v1_neg_risk_exchange() -> anyhow::Result<()> {
+            use std::borrow::Cow;
+
             use alloy::dyn_abi::Eip712Domain;
             use alloy::sol_types::SolStruct as _;
-            use std::borrow::Cow;
 
             let server = MockServer::start();
             let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
@@ -4656,9 +4659,10 @@ mod v1 {
 
         #[tokio::test]
         async fn v2_neg_risk_signs_against_v2_neg_risk_exchange() -> anyhow::Result<()> {
+            use std::borrow::Cow;
+
             use alloy::dyn_abi::Eip712Domain;
             use alloy::sol_types::SolStruct as _;
-            use std::borrow::Cow;
 
             let server = MockServer::start();
             let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
@@ -4710,9 +4714,10 @@ mod v1 {
         /// addresses flow into the EIP-712 domain and therefore into the hash).
         #[tokio::test]
         async fn v2_neg_risk_and_v2_normal_signatures_diverge() -> anyhow::Result<()> {
+            use std::borrow::Cow;
+
             use alloy::dyn_abi::Eip712Domain;
             use alloy::sol_types::SolStruct as _;
-            use std::borrow::Cow;
 
             let signer = LocalSigner::from_str(PRIVATE_KEY)?.with_chain_id(Some(POLYGON));
             let v2_order = polymarket_client_sdk_v2::clob::types::OrderV2::default();
