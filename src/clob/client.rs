@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 #[cfg(feature = "heartbeats")]
 use std::time::Duration;
 
@@ -24,7 +25,6 @@ use uuid::Uuid;
 #[cfg(feature = "heartbeats")]
 use {tokio::sync::oneshot::Receiver, tokio::time, tokio_util::sync::CancellationToken};
 
-use crate::auth::builder::{Builder, Config as BuilderConfig};
 use crate::auth::state::{Authenticated, State, Unauthenticated};
 use crate::auth::{Credentials, Kind, Normal};
 use crate::clob::order_builder::{Limit, Market, OrderBuilder, generate_seed};
@@ -37,7 +37,7 @@ use crate::clob::types::request::{
 use crate::clob::types::response::{
     ApiKeysResponse, BalanceAllowanceResponse, BanStatusResponse, BuilderApiKeyResponse,
     BuilderFeeRateResponse, BuilderTradeResponse, CancelOrdersResponse, ClobMarketInfoResponse,
-    CurrentRewardResponse, FeeRateResponse, GeoblockResponse, HeartbeatResponse,
+    CurrentRewardResponse, FeeInfo, FeeRateResponse, GeoblockResponse, HeartbeatResponse,
     LastTradePriceResponse, LastTradesPricesResponse, MarketResponse, MarketRewardResponse,
     MidpointResponse, MidpointsResponse, NegRiskResponse, NotificationResponse, OpenOrderResponse,
     OrderBookSummaryResponse, OrderScoringResponse, OrdersScoringResponse, Page, PostOrderResponse,
@@ -67,6 +67,8 @@ const ORDER_NAME: Option<Cow<'static, str>> = Some(Cow::Borrowed("Polymarket CTF
 const VERSION_V2: Option<Cow<'static, str>> = Some(Cow::Borrowed("2"));
 
 const TERMINAL_CURSOR: &str = "LTE="; // base64("-1")
+
+const ORDER_VERSION_MISMATCH_ERROR: &str = "order_version_mismatch";
 
 /// The type used to build a request to authenticate the inner [`Client<Unauthorized>`]. Calling
 /// `authenticate` on this will elevate that inner `client` into an [`Client<Authenticated<K>>`].
@@ -225,7 +227,10 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
                 tick_sizes: inner.tick_sizes,
                 neg_risk: inner.neg_risk,
                 fee_rate_bps: inner.fee_rate_bps,
+                fee_infos: inner.fee_infos,
+                token_condition_map: inner.token_condition_map,
                 builder_fee_rates: inner.builder_fee_rates,
+                cached_version: inner.cached_version,
                 funder,
                 signature_type: self.signature_type.unwrap_or(SignatureType::Eoa),
                 salt_generator: self.salt_generator.unwrap_or(generate_seed),
@@ -244,12 +249,10 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
 /// The main way for API users to interact with the Polymarket CLOB.
 ///
 /// A [`Client`] can either be [`Unauthenticated`] or [`Authenticated`], that is, authenticated
-/// with a particular [`Signer`], `S`, and a particular [`Kind`], `K`. That [`Kind`] lets
-/// the client know if it's authenticating [`Normal`]ly or as a [`auth::builder::Builder`].
+/// with a particular [`Signer`], `S`, and a particular [`Kind`], `K`.
 ///
 /// Only the allowed methods will be available for use when in a particular state, i.e. only
-/// unauthenticated methods will be visible when unauthenticated, same for authenticated/builder
-/// authenticated methods.
+/// unauthenticated methods will be visible when unauthenticated, same for authenticated ones.
 ///
 /// [`Client`] is thread-safe
 ///
@@ -372,6 +375,9 @@ pub struct Config {
     /// This is primarily useful for testing.
     #[builder(into)]
     geoblock_host: Option<String>,
+    /// Default builder code inherited by orders built via [`Client::limit_order`] or
+    /// [`Client::market_order`] when not set on the order itself.
+    builder_code: Option<B256>,
     #[cfg(feature = "heartbeats")]
     #[builder(default = Duration::from_secs(5))]
     /// How often the [`Client`] will automatically submit heartbeats. The default is five (5) seconds.
@@ -383,6 +389,7 @@ impl Default for Config {
         Self {
             use_server_time: false,
             geoblock_host: None,
+            builder_code: None,
             #[cfg(feature = "heartbeats")]
             heartbeat_interval: Duration::from_secs(5),
         }
@@ -407,10 +414,16 @@ struct ClientInner<S: State> {
     tick_sizes: DashMap<U256, TickSize>,
     /// Local cache representing whether this token is part of a `neg_risk` market
     neg_risk: DashMap<U256, bool>,
-    /// Local cache of the fee rate (`base_fee` + exponent) per token ID
+    /// V1 `/fee-rate` cache. V2 fee calculation uses [`Self::fee_infos`] instead.
     fee_rate_bps: DashMap<U256, FeeRateResponse>,
+    /// V2 fee parameters from `/clob-markets/{id}` `fd`, used for market-order fee sizing.
+    fee_infos: DashMap<U256, FeeInfo>,
+    /// Caches `token_id -> condition_id` to avoid repeated `/markets-by-token` calls.
+    token_condition_map: DashMap<U256, B256>,
     /// Local cache of builder fee rates per builder code
     builder_fee_rates: DashMap<B256, BuilderFeeRateResponse>,
+    /// Lazily resolved CLOB protocol version. `0` means uncached.
+    cached_version: AtomicU32,
     /// The funder for this [`ClientInner`]. If funder is present, then `signature_type` cannot
     /// be [`SignatureType::Eoa`]. Conversely, if funder is absent, then `signature_type` cannot be
     /// [`SignatureType::Proxy`] or [`SignatureType::GnosisSafe`].
@@ -623,18 +636,39 @@ impl<S: State> Client<S> {
         self.inner.server_time().await
     }
 
-    /// Returns the API version supported by the server (1 or 2).
+    /// Returns the API version supported by the server (1 or 2). The result is cached
+    /// after the first successful call; subsequent calls return the cached value.
     ///
     /// # Errors
     ///
     /// Returns an error if the request fails.
     pub async fn version(&self) -> Result<u32> {
+        self.resolve_version(false).await
+    }
+
+    /// Resolves the CLOB server version. Returns the cached value unless `force` is set.
+    pub(crate) async fn resolve_version(&self, force: bool) -> Result<u32> {
+        #[derive(serde::Deserialize)]
+        struct VersionBody {
+            version: u32,
+        }
+
+        if !force {
+            let cached = self.inner.cached_version.load(Ordering::Relaxed);
+            if cached != 0 {
+                return Ok(cached);
+            }
+        }
+
         let request = self
             .client()
             .request(Method::GET, format!("{}version", self.host()))
             .build()?;
-
-        crate::request(&self.inner.client, request, None).await
+        let body: VersionBody = crate::request(&self.inner.client, request, None).await?;
+        self.inner
+            .cached_version
+            .store(body.version, Ordering::Relaxed);
+        Ok(body.version)
     }
 
     /// Retrieves the midpoint price for a single market outcome token.
@@ -896,6 +930,16 @@ impl<S: State> Client<S> {
         Ok(response)
     }
 
+    /// Returns the V2 platform-fee exponent (`fd.e`) for `token_id`. Defaults to `0` on
+    /// legacy or fee-free markets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if market metadata cannot be resolved.
+    pub async fn fee_exponent(&self, token_id: U256) -> Result<u32> {
+        Ok(self.fee_info(token_id).await?.exponent)
+    }
+
     /// Checks if the current IP address is geoblocked from accessing Polymarket.
     ///
     /// This method queries the Polymarket geoblock endpoint to determine if access
@@ -993,6 +1037,15 @@ impl<S: State> Client<S> {
             .build()?;
 
         crate::request(&self.inner.client, request, None).await
+    }
+
+    /// Hash of an order-book summary, for change-detection against the server's `hash`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the book fails to serialize.
+    pub fn order_book_hash(&self, book: &OrderBookSummaryResponse) -> Result<String> {
+        book.hash()
     }
 
     /// Retrieves the price of the most recent trade for a market outcome token.
@@ -1205,23 +1258,68 @@ impl<S: State> Client<S> {
         let response: ClobMarketInfoResponse =
             crate::request(&self.inner.client, request, None).await?;
 
-        let fee_rate = FeeRateResponse {
-            base_fee: response.fee_rate_bps,
-            exponent: response.fee_exponent,
-        };
-        for token in &response.tokens {
+        // Do NOT populate `fee_rate_bps` here — that cache belongs to the V1 `/fee-rate`
+        // endpoint, which uses different units.
+        let fee_info = response
+            .fee_details
+            .as_ref()
+            .map_or(FeeInfo::default(), |fd| FeeInfo {
+                rate: fd.rate,
+                exponent: fd.exponent,
+            });
+        for token in response.tokens.iter().flatten() {
             self.inner
                 .tick_sizes
                 .insert(token.token_id, response.min_tick_size);
             self.inner
                 .neg_risk
                 .insert(token.token_id, response.neg_risk);
+            self.inner.fee_infos.insert(token.token_id, fee_info);
             self.inner
-                .fee_rate_bps
-                .insert(token.token_id, fee_rate.clone());
+                .token_condition_map
+                .insert(token.token_id, response.condition_id);
         }
 
         Ok(response)
+    }
+
+    /// Primes the tick-size, neg-risk, and fee caches for `token_id` from
+    /// `/clob-markets/{id}`, resolving the condition via `/markets-by-token` if needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the market lookup or the clob-market-info fetch fails.
+    pub(crate) async fn ensure_market_info_cached(&self, token_id: U256) -> Result<()> {
+        if self.inner.fee_infos.contains_key(&token_id) {
+            return Ok(());
+        }
+        let condition_id = if let Some(cid) = self.inner.token_condition_map.get(&token_id) {
+            *cid
+        } else {
+            let market = self.market_by_token(token_id).await?;
+            let cid = market.condition_id.ok_or_else(|| {
+                Error::validation(format!("market for token {token_id} has no condition_id"))
+            })?;
+            self.inner.token_condition_map.insert(token_id, cid);
+            cid
+        };
+        self.clob_market_info(&condition_id.to_string()).await?;
+        Ok(())
+    }
+
+    /// Returns V2 fee parameters for `token_id`, priming the cache as needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if market metadata cannot be resolved.
+    pub(crate) async fn fee_info(&self, token_id: U256) -> Result<FeeInfo> {
+        self.ensure_market_info_cached(token_id).await?;
+        Ok(self
+            .inner
+            .fee_infos
+            .get(&token_id)
+            .map(|e| *e)
+            .unwrap_or_default())
     }
 
     /// Looks up a market by token ID.
@@ -1342,7 +1440,10 @@ impl Client<Unauthenticated> {
                 tick_sizes: DashMap::new(),
                 neg_risk: DashMap::new(),
                 fee_rate_bps: DashMap::new(),
+                fee_infos: DashMap::new(),
+                token_condition_map: DashMap::new(),
                 builder_fee_rates: DashMap::new(),
+                cached_version: AtomicU32::new(0),
                 state: Unauthenticated,
                 funder: None,
                 signature_type: SignatureType::Eoa,
@@ -1455,7 +1556,10 @@ impl<K: Kind> Client<Authenticated<K>> {
                 tick_sizes: inner.tick_sizes,
                 neg_risk: inner.neg_risk,
                 fee_rate_bps: inner.fee_rate_bps,
+                fee_infos: inner.fee_infos,
+                token_condition_map: inner.token_condition_map,
                 builder_fee_rates: inner.builder_fee_rates,
+                cached_version: inner.cached_version,
                 // Reset the order parameters that were previously stored on the client
                 funder: None,
                 signature_type: SignatureType::Eoa,
@@ -1633,7 +1737,9 @@ impl<K: Kind> Client<Authenticated<K>> {
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        crate::request(&self.inner.client, request, Some(headers)).await
+        let result = crate::request(&self.inner.client, request, Some(headers)).await;
+        self.invalidate_version_if_mismatch(&result).await;
+        result
     }
 
     /// Posts multiple signed orders to the orderbook in a single request.
@@ -1653,7 +1759,19 @@ impl<K: Kind> Client<Authenticated<K>> {
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        crate::request(&self.inner.client, request, Some(headers)).await
+        let result = crate::request(&self.inner.client, request, Some(headers)).await;
+        self.invalidate_version_if_mismatch(&result).await;
+        result
+    }
+
+    async fn invalidate_version_if_mismatch<T>(&self, result: &Result<T>) {
+        let Err(err) = result else { return };
+        let Some(status) = err.downcast_ref::<crate::error::Status>() else {
+            return;
+        };
+        if status.message.contains(ORDER_VERSION_MISMATCH_ERROR) {
+            let _: Result<u32> = self.resolve_version(true).await;
+        }
     }
 
     /// Attempts to return the corresponding order at the provided `order_id`
@@ -1827,13 +1945,10 @@ impl<K: Kind> Client<Authenticated<K>> {
                 Method::DELETE,
                 format!("{}notifications{params}", self.host()),
             )
-            .json(&request)
             .build()?;
         let headers = self.create_headers(&request).await?;
         *request.headers_mut() = headers;
 
-        // We have to send the request separately from `self.request` because this endpoint does
-        // not return anything in the response body. Otherwise, we would get an EOF error from reqwest
         self.client().execute(request).await?;
 
         Ok(())
@@ -2020,7 +2135,7 @@ impl<K: Kind> Client<Authenticated<K>> {
             .client()
             .request(
                 Method::GET,
-                format!("{}rewards/user/total{params}", self.host()),
+                format!("{}rewards/user/markets{params}", self.host()),
             )
             .query(&[(
                 "signature_type",
@@ -2245,6 +2360,71 @@ impl<K: Kind> Client<Authenticated<K>> {
             .client()
             .request(Method::POST, format!("{}auth/builder-api-key", self.host()))
             .build()?;
+        let headers = self.create_headers(&request).await?;
+
+        crate::request(&self.inner.client, request, Some(headers)).await
+    }
+
+    /// Lists all Builder API keys issued to the authenticated account.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails.
+    pub async fn builder_api_keys(&self) -> Result<Vec<BuilderApiKeyResponse>> {
+        let request = self
+            .client()
+            .request(Method::GET, format!("{}auth/builder-api-key", self.host()))
+            .build()?;
+        let headers = self.create_headers(&request).await?;
+
+        crate::request(&self.inner.client, request, Some(headers)).await
+    }
+
+    /// Revokes the Builder API key associated with the authenticated account.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails.
+    pub async fn revoke_builder_api_key(&self) -> Result<()> {
+        let mut request = self
+            .client()
+            .request(
+                Method::DELETE,
+                format!("{}auth/builder-api-key", self.host()),
+            )
+            .build()?;
+        let headers = self.create_headers(&request).await?;
+
+        *request.headers_mut() = headers;
+
+        // The server returns no body; calling `crate::request` would EOF while decoding.
+        self.client().execute(request).await?;
+
+        Ok(())
+    }
+
+    /// Returns trades attributed to `builder_code`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or `builder_code` is the zero hash.
+    pub async fn builder_trades(
+        &self,
+        builder_code: B256,
+        request: &TradesRequest,
+        next_cursor: Option<String>,
+    ) -> Result<Page<BuilderTradeResponse>> {
+        if builder_code == B256::ZERO {
+            return Err(Error::validation("builder_code is required and cannot be zero"));
+        }
+        let params = request.query_params(next_cursor.as_deref());
+        let sep = if params.is_empty() { '?' } else { '&' };
+        let url = format!(
+            "{}builder/trades{params}{sep}builder_code={builder_code}",
+            self.host()
+        );
+
+        let request = self.client().request(Method::GET, url).build()?;
         let headers = self.create_headers(&request).await?;
 
         crate::request(&self.inner.client, request, Some(headers)).await
@@ -2589,7 +2769,7 @@ impl<K: Kind> Client<Authenticated<K>> {
             order_type: None,
             post_only: Some(false),
             metadata: None,
-            builder_code: None,
+            builder_code: self.inner.config.builder_code,
             defer_exec: None,
             user_usdc_balance: None,
             client: Client {
@@ -2599,124 +2779,6 @@ impl<K: Kind> Client<Authenticated<K>> {
             },
             _kind: PhantomData,
         }
-    }
-}
-
-impl Client<Authenticated<Normal>> {
-    /// Convert this [`Client<Authenticated<Normal>>`] to [`Client<Authenticated<Builder>>`] using
-    /// the provided `config`.
-    ///
-    /// Note: If `heartbeats` feature flag is enabled, then this method _will_ cancel all
-    /// outstanding orders since it will disable the background heartbeats task and then
-    /// re-enable it.
-    #[cfg_attr(
-        not(feature = "heartbeats"),
-        expect(
-            clippy::unused_async,
-            unused_mut,
-            reason = "Nothing to await or modify when heartbeats are disabled"
-        )
-    )]
-    pub async fn promote_to_builder(
-        mut self,
-        config: BuilderConfig,
-    ) -> Result<Client<Authenticated<Builder>>> {
-        #[cfg(feature = "heartbeats")]
-        self.heartbeat_token.cancel_and_wait().await?;
-
-        let inner = Arc::into_inner(self.inner).ok_or(Synchronization)?;
-
-        let state = Authenticated {
-            address: inner.state.address,
-            credentials: inner.state.credentials,
-            kind: Builder {
-                config,
-                client: inner.client.clone(),
-            },
-        };
-
-        let new_inner = ClientInner {
-            config: inner.config,
-            state,
-            host: inner.host,
-            geoblock_host: inner.geoblock_host,
-            client: inner.client,
-            tick_sizes: inner.tick_sizes,
-            neg_risk: inner.neg_risk,
-            fee_rate_bps: inner.fee_rate_bps,
-            builder_fee_rates: inner.builder_fee_rates,
-            funder: inner.funder,
-            signature_type: inner.signature_type,
-            salt_generator: inner.salt_generator,
-        };
-
-        #[cfg_attr(
-            not(feature = "heartbeats"),
-            expect(
-                unused_mut,
-                reason = "Modifier only needed when heartbeats feature is enabled"
-            )
-        )]
-        let mut client = Client {
-            inner: Arc::new(new_inner),
-            #[cfg(feature = "heartbeats")]
-            heartbeat_token: DroppingCancellationToken(None),
-        };
-
-        #[cfg(feature = "heartbeats")]
-        Client::<Authenticated<Builder>>::start_heartbeats(&mut client)?;
-
-        Ok(client)
-    }
-}
-
-impl Client<Authenticated<Builder>> {
-    pub async fn builder_api_keys(&self) -> Result<Vec<BuilderApiKeyResponse>> {
-        let request = self
-            .client()
-            .request(Method::GET, format!("{}auth/builder-api-key", self.host()))
-            .build()?;
-        let headers = self.create_headers(&request).await?;
-
-        crate::request(&self.inner.client, request, Some(headers)).await
-    }
-
-    pub async fn revoke_builder_api_key(&self) -> Result<()> {
-        let mut request = self
-            .client()
-            .request(
-                Method::DELETE,
-                format!("{}auth/builder-api-key", self.host()),
-            )
-            .build()?;
-        let headers = self.create_headers(&request).await?;
-
-        *request.headers_mut() = headers;
-
-        // We have to send the request separately from `self.request` because this endpoint does
-        // not return anything in the response body. Otherwise, we would get an EOF error from reqwest
-        self.client().execute(request).await?;
-
-        Ok(())
-    }
-
-    pub async fn builder_trades(
-        &self,
-        request: &TradesRequest,
-        next_cursor: Option<String>,
-    ) -> Result<Page<BuilderTradeResponse>> {
-        let params = request.query_params(next_cursor.as_deref());
-
-        let request = self
-            .client()
-            .request(
-                Method::GET,
-                format!("{}builder/trades{params}", self.host()),
-            )
-            .build()?;
-        let headers = self.create_headers(&request).await?;
-
-        crate::request(&self.inner.client, request, Some(headers)).await
     }
 }
 

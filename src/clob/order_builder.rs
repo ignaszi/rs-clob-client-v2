@@ -433,12 +433,12 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
         }
 
         let amount = match (side, amount.0, self.user_usdc_balance) {
-            (Side::Buy, AmountInner::Usdc(raw), Some(balance))
-                if matches!(order_type, OrderType::FOK | OrderType::FAK) =>
-            {
-                let fee = self.client.fee_rate_bps(token_id).await?;
-                let fee_rate = Decimal::from(fee.base_fee) / Decimal::from(10_000_u32);
-                let fee_exponent = Decimal::from(fee.exponent.unwrap_or(0));
+            (Side::Buy, AmountInner::Usdc(raw), Some(balance)) => {
+                // V2 uses `/clob-markets/{id}` `fd` (rate + exponent); `/fee-rate`
+                // only exposes V1 bps and would silently mis-size V2 orders.
+                let fee = self.client.fee_info(token_id).await?;
+                let fee_rate = fee.rate;
+                let fee_exponent = Decimal::from(fee.exponent);
                 let builder_taker_fee = match self.builder_code {
                     Some(code) if code != B256::ZERO => {
                         let rate = self.client.builder_fee_rate(code).await?;

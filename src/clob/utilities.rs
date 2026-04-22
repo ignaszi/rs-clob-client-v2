@@ -191,7 +191,8 @@ pub fn adjust_market_buy_amount(
     let platform_fee = amount / price * platform_fee_rate;
     let total_cost = amount + platform_fee + amount * builder_taker_fee_rate;
 
-    let raw = if user_usdc_balance < total_cost {
+    // `<=` matches the TS client at the exact-equality boundary.
+    let raw = if user_usdc_balance <= total_cost {
         let divisor = Decimal::ONE + platform_fee_rate / price + builder_taker_fee_rate;
         user_usdc_balance / divisor
     } else {
@@ -475,5 +476,320 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.to_string().contains("truncated to zero"));
+    }
+
+    // Fee calculation tests ported from TS `feeCalculations.test.ts`.
+
+    /// `platform_fee = (amount / price) × rate × (price × (1 − price))^exponent`.
+    fn calc_platform_fee(amount: Decimal, price: Decimal, rate: Decimal, exponent: u32) -> Decimal {
+        let base = price * (Decimal::ONE - price);
+        let base_f64 = f64::try_from(base).unwrap_or(0.0);
+        let rate_factor = rate
+            * Decimal::try_from(base_f64.powi(i32::try_from(exponent).unwrap_or(0)))
+                .unwrap_or(Decimal::ZERO);
+        (amount / price) * rate_factor
+    }
+
+    /// `builder_fee = amount × rate` (flat percentage on notional).
+    fn calc_builder_fee(amount: Decimal, rate: Decimal) -> Decimal {
+        amount * rate
+    }
+
+    fn close_to(actual: Decimal, expected: Decimal, tol: Decimal) {
+        let diff = (actual - expected).abs();
+        assert!(
+            diff <= tol,
+            "|{actual} − {expected}| = {diff} exceeds tolerance {tol}"
+        );
+    }
+
+    // Platform fee at representative prices (rate=0.25, exp=2, C=100 contracts).
+
+    #[test]
+    fn platform_fee_0_25_exp_2_at_midprice() {
+        // price=0.5 → 1.5625
+        close_to(
+            calc_platform_fee(dec!(100) * dec!(0.5), dec!(0.5), dec!(0.25), 2),
+            dec!(1.5625),
+            dec!(0.000001),
+        );
+    }
+
+    #[test]
+    fn platform_fee_0_25_exp_2_symmetric_prices() {
+        // (0.3, 0.7), (0.1, 0.9), (0.05, 0.95), (0.01, 0.99) must all pair up.
+        let cases = [
+            (dec!(0.3), dec!(0.7), dec!(1.1025)),
+            (dec!(0.1), dec!(0.9), dec!(0.2025)),
+            (dec!(0.05), dec!(0.95), dec!(0.05640625)),
+            (dec!(0.01), dec!(0.99), dec!(0.00245025)),
+        ];
+        for (p_low, p_high, expected) in cases {
+            close_to(
+                calc_platform_fee(dec!(100) * p_low, p_low, dec!(0.25), 2),
+                expected,
+                dec!(0.000001),
+            );
+            close_to(
+                calc_platform_fee(dec!(100) * p_high, p_high, dec!(0.25), 2),
+                expected,
+                dec!(0.000001),
+            );
+        }
+    }
+
+    #[test]
+    fn platform_fee_0_25_exp_2_fractional_contracts() {
+        // price=0.5, C=125.5 → 1.9609375
+        close_to(
+            calc_platform_fee(dec!(125.5) * dec!(0.5), dec!(0.5), dec!(0.25), 2),
+            dec!(1.9609375),
+            dec!(0.000001),
+        );
+    }
+
+    // Builder fee (flat %).
+
+    #[test]
+    fn builder_fee_1_pct() {
+        // 1% on 100 contracts at 50c → 0.5
+        close_to(
+            calc_builder_fee(dec!(100) * dec!(0.5), dec!(0.01)),
+            dec!(0.5),
+            dec!(0.000001),
+        );
+    }
+
+    #[test]
+    fn builder_fee_5_pct() {
+        // 5% on 200 contracts at 75c → 7.5
+        close_to(
+            calc_builder_fee(dec!(200) * dec!(0.75), dec!(0.05)),
+            dec!(7.5),
+            dec!(0.000001),
+        );
+    }
+
+    // Combined platform + builder fee.
+
+    #[test]
+    fn combined_platform_and_builder_fee() {
+        let amount_usd = dec!(100) * dec!(0.5);
+        let platform = calc_platform_fee(amount_usd, dec!(0.5), dec!(0.25), 2);
+        let builder = calc_builder_fee(amount_usd, dec!(0.01));
+        close_to(platform, dec!(1.5625), dec!(0.000001));
+        close_to(builder, dec!(0.5), dec!(0.000001));
+        close_to(platform + builder, dec!(2.0625), dec!(0.000001));
+    }
+
+    // `adjust_market_buy_amount` boundary behaviour.
+
+    #[test]
+    fn adjust_buy_balance_strictly_greater_returns_amount_unchanged() {
+        let amount = dec!(50);
+        let price = dec!(0.5);
+        let fee = calc_platform_fee(amount, price, dec!(0.25), 2);
+        let balance = amount + fee + dec!(1); // comfortably above total cost
+        let result =
+            adjust_market_buy_amount(amount, balance, price, dec!(0.25), dec!(2), dec!(0)).unwrap();
+        assert_eq!(result, amount);
+    }
+
+    #[test]
+    fn adjust_buy_balance_equal_to_total_cost_matches_divide_path() {
+        // TS boundary: at `balance == totalCost` the `<=` check fires and returns
+        // `balance / divisor`, which equals the original amount by construction.
+        let amount = dec!(50);
+        let price = dec!(0.5);
+        let fee = calc_platform_fee(amount, price, dec!(0.25), 2);
+        let total_cost = amount + fee;
+        let result =
+            adjust_market_buy_amount(amount, total_cost, price, dec!(0.25), dec!(2), dec!(0))
+                .unwrap();
+        close_to(result, amount, dec!(0.000001));
+    }
+
+    #[test]
+    fn adjust_buy_conserves_notional_platform_only() {
+        // balance = amount (no room for fees): adjusted + fee must reconstitute `amount`.
+        let amount = dec!(50);
+        let price = dec!(0.5);
+        let adjusted =
+            adjust_market_buy_amount(amount, amount, price, dec!(0.25), dec!(2), dec!(0)).unwrap();
+        let fee = calc_platform_fee(adjusted, price, dec!(0.25), 2);
+        close_to(adjusted + fee, amount, dec!(0.000001));
+        assert!(adjusted < amount);
+    }
+
+    #[test]
+    fn adjust_buy_conserves_notional_builder_only() {
+        let amount = dec!(50);
+        let price = dec!(0.5);
+        let builder_rate = dec!(0.01);
+        let adjusted =
+            adjust_market_buy_amount(amount, amount, price, dec!(0), dec!(0), builder_rate)
+                .unwrap();
+        let fee = calc_builder_fee(adjusted, builder_rate);
+        close_to(adjusted + fee, amount, dec!(0.000001));
+    }
+
+    #[test]
+    fn adjust_buy_conserves_notional_platform_and_builder() {
+        let amount = dec!(50);
+        let price = dec!(0.5);
+        let builder_rate = dec!(0.01);
+        let adjusted = adjust_market_buy_amount(
+            amount,
+            amount,
+            price,
+            dec!(0.25),
+            dec!(2),
+            builder_rate,
+        )
+        .unwrap();
+        let platform = calc_platform_fee(adjusted, price, dec!(0.25), 2);
+        let builder = calc_builder_fee(adjusted, builder_rate);
+        close_to(adjusted + platform + builder, amount, dec!(0.000001));
+    }
+
+    #[test]
+    fn adjust_buy_conserves_notional_at_price_0_3() {
+        let amount = dec!(30);
+        let price = dec!(0.3);
+        let builder_rate = dec!(0.02);
+        let adjusted = adjust_market_buy_amount(
+            amount,
+            amount,
+            price,
+            dec!(0.25),
+            dec!(2),
+            builder_rate,
+        )
+        .unwrap();
+        let platform = calc_platform_fee(adjusted, price, dec!(0.25), 2);
+        let builder = calc_builder_fee(adjusted, builder_rate);
+        close_to(adjusted + platform + builder, amount, dec!(0.000001));
+    }
+
+    // Production V2 fee tiers (all exp=1):
+    //   sports          rate=0.03
+    //   politics family rate=0.04  (politics, tech, finance_prices, mentions)
+    //   culture family  rate=0.05  (culture, weather, general, economics)
+    //   crypto          rate=0.072
+
+    #[test]
+    fn production_fee_sports_v2() {
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.03), 1),
+            dec!(1.5),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.03), 1),
+            dec!(2.1),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.03), 1),
+            dec!(0.9),
+            dec!(0.000001),
+        );
+    }
+
+    #[test]
+    fn production_fee_politics_family() {
+        // rate=0.04, exp=1 — politics, tech, finance_prices, mentions
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.04), 1),
+            dec!(2.0),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.04), 1),
+            dec!(2.8),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.04), 1),
+            dec!(1.2),
+            dec!(0.000001),
+        );
+    }
+
+    #[test]
+    fn production_fee_culture_family() {
+        // rate=0.05, exp=1 — culture, weather, general, economics
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.05), 1),
+            dec!(2.5),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.05), 1),
+            dec!(3.5),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.05), 1),
+            dec!(1.5),
+            dec!(0.000001),
+        );
+    }
+
+    #[test]
+    fn production_fee_crypto_v2() {
+        // rate=0.072, exp=1
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.5), dec!(0.072), 1),
+            dec!(3.6),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.3), dec!(0.072), 1),
+            dec!(5.04),
+            dec!(0.000001),
+        );
+        close_to(
+            calc_platform_fee(dec!(100), dec!(0.7), dec!(0.072), 1),
+            dec!(2.16),
+            dec!(0.000001),
+        );
+    }
+
+    #[test]
+    fn production_adjust_buy_conserves_notional_across_all_tiers() {
+        // For every production tier at prices {0.3, 0.5, 0.7}, `adjust + fee ≈ amount`
+        // when `balance == amount` (i.e. the budget is fully consumed).
+        let amount = dec!(100);
+        let tiers: [(&str, Decimal, u32); 4] = [
+            ("sports_v2", dec!(0.03), 1),
+            ("politics_family", dec!(0.04), 1),
+            ("culture_family", dec!(0.05), 1),
+            ("crypto_v2", dec!(0.072), 1),
+        ];
+        let prices = [dec!(0.3), dec!(0.5), dec!(0.7)];
+        for (name, rate, exponent) in tiers {
+            for price in prices {
+                let adjusted = adjust_market_buy_amount(
+                    amount,
+                    amount,
+                    price,
+                    rate,
+                    Decimal::from(exponent),
+                    dec!(0),
+                )
+                .unwrap_or_else(|e| {
+                    panic!("adjust failed for {name} @ price={price}: {e}");
+                });
+                let fee = calc_platform_fee(adjusted, price, rate, exponent);
+                let diff = (adjusted + fee - amount).abs();
+                assert!(
+                    diff <= dec!(0.0001),
+                    "tier={name} price={price}: adjusted ({adjusted}) + fee ({fee}) = {} vs \
+                     amount {amount}, diff {diff}",
+                    adjusted + fee,
+                );
+            }
+        }
     }
 }

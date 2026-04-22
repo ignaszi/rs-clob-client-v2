@@ -107,7 +107,6 @@ use polymarket_client_sdk_v2::auth::{
     LocalSigner, Signer,          // from alloy::signers (LocalSigner + trait)
     Uuid, ApiKey,                 // from uuid (ApiKey = Uuid)
     SecretString, ExposeSecret,   // from secrecy
-    builder::Url,                 // from url (for remote builder config)
 };
 ```
 
@@ -340,41 +339,39 @@ let order = client
     .await?;
 ```
 
-#### Builder-authenticated client
+#### Builder-attributed trading
 
-For institutional/third-party app integrations with remote signing:
+In V2, builder attribution is carried on the order's `builder_code` field (and as a
+query parameter on `builder_trades`). Set a default `builder_code` on the [`Config`] and
+every order constructed via [`Client::limit_order`] / [`Client::market_order`] inherits
+it unless overridden.
+
 ```rust,ignore
 use std::str::FromStr as _;
 
 use alloy::signers::Signer as _;
 use alloy::signers::local::LocalSigner;
-use polymarket_client_sdk_v2::auth::builder::Config as BuilderConfig;
-use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
 use polymarket_client_sdk_v2::clob::{Client, Config};
-use polymarket_client_sdk_v2::clob::types::SignatureType;
 use polymarket_client_sdk_v2::clob::types::request::TradesRequest;
+use polymarket_client_sdk_v2::types::B256;
+use polymarket_client_sdk_v2::{POLYGON, PRIVATE_KEY_VAR};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let private_key = std::env::var(PRIVATE_KEY_VAR).expect("Need a private key");
+    let builder_code = B256::from_str(&std::env::var("POLYMARKET_BUILDER_CODE")?)?;
     let signer = LocalSigner::from_str(&private_key)?.with_chain_id(Some(POLYGON));
-    let builder_config = BuilderConfig::remote("http://localhost:3000/sign", None)?; // Or your signing server
 
-    let client = Client::new("https://clob-v2.polymarket.com", Config::default())?
+    let config = Config::builder().builder_code(builder_code).build();
+    let client = Client::new("https://clob-v2.polymarket.com", config)?
         .authentication_builder(&signer)
-        .signature_type(SignatureType::Proxy)  // Funder auto-derived via CREATE2
         .authenticate()
         .await?;
 
-    let client = client.promote_to_builder(builder_config).await?;
-
-    let ok = client.ok().await?;
-    println!("Ok: {ok}");
-
-    let api_keys = client.api_keys().await?;
-    println!("API keys: {api_keys:?}");
-
-    let builder_trades = client.builder_trades(&TradesRequest::default(), None).await?;
+    // Orders built below will carry the configured `builder_code`.
+    let builder_trades = client
+        .builder_trades(builder_code, &TradesRequest::default(), None)
+        .await?;
     println!("Builder trades: {builder_trades:?}");
 
     Ok(())
