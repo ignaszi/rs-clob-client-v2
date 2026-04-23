@@ -131,6 +131,111 @@ path = "examples/clob/unauthenticated.rs"
 required-features = ["clob", "tracing"]
 
 [[example]]
+name = "get_midpoint"
+path = "examples/clob/market/get_midpoint.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_orderbook"
+path = "examples/clob/market/get_orderbook.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_price"
+path = "examples/clob/market/get_price.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_spread"
+path = "examples/clob/market/get_spread.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_last_trade_price"
+path = "examples/clob/market/get_last_trade_price.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_server_time"
+path = "examples/clob/market/get_server_time.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "create_or_derive_api_key"
+path = "examples/clob/keys/create_or_derive_api_key.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_api_keys"
+path = "examples/clob/keys/get_api_keys.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "delete_api_key"
+path = "examples/clob/keys/delete_api_key.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_balance_allowance"
+path = "examples/clob/account/get_balance_allowance.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "update_balance_allowance"
+path = "examples/clob/account/update_balance_allowance.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_open_orders"
+path = "examples/clob/account/get_open_orders.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_trades"
+path = "examples/clob/account/get_trades.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_notifications"
+path = "examples/clob/account/get_notifications.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "gtc_limit_buy"
+path = "examples/clob/orders/gtc_limit_buy.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "gtc_limit_sell"
+path = "examples/clob/orders/gtc_limit_sell.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "market_buy"
+path = "examples/clob/orders/market_buy.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "cancel_order"
+path = "examples/clob/orders/cancel_order.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "cancel_all"
+path = "examples/clob/orders/cancel_all.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "is_order_scoring"
+path = "examples/clob/scoring/is_order_scoring.rs"
+required-features = ["clob"]
+
+[[example]]
+name = "get_closed_only_mode"
+path = "examples/clob/scoring/get_closed_only_mode.rs"
+required-features = ["clob"]
+
+[[example]]
 name = "approvals"
 path = "examples/approvals.rs"
 required-features = ["tracing"]
