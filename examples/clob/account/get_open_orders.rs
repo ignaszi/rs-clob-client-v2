@@ -34,7 +34,10 @@ async fn main() -> anyhow::Result<()> {
     let page = client.orders(&request, None).await?;
     println!("{} open order(s)", page.data.len());
     for order in &page.data {
-        println!("  {} {} {} @ {}", order.id, order.side, order.original_size, order.price);
+        println!(
+            "  {} {} {} @ {}",
+            order.id, order.side, order.original_size, order.price
+        );
     }
     Ok(())
 }

@@ -34,7 +34,10 @@ async fn main() -> anyhow::Result<()> {
     let page = client.trades(&request, None).await?;
     println!("{} trade(s)", page.data.len());
     for trade in &page.data {
-        println!("  {} {} {} @ {}", trade.id, trade.side, trade.size, trade.price);
+        println!(
+            "  {} {} {} @ {}",
+            trade.id, trade.side, trade.size, trade.price
+        );
     }
     Ok(())
 }

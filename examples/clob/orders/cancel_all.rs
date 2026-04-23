@@ -25,6 +25,10 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     let resp = client.cancel_all_orders().await?;
-    println!("canceled: {}, not canceled: {}", resp.canceled.len(), resp.not_canceled.len());
+    println!(
+        "canceled: {}, not canceled: {}",
+        resp.canceled.len(),
+        resp.not_canceled.len()
+    );
     Ok(())
 }
