@@ -89,9 +89,6 @@ pub struct NegRiskResponse {
 #[derive(Clone, Debug, Deserialize, Builder, PartialEq)]
 pub struct FeeRateResponse {
     pub base_fee: u32,
-    /// Fee exponent for the platform fee formula (V2).
-    #[serde(default)]
-    pub exponent: Option<u32>,
 }
 
 /// Response from the Polymarket geoblock endpoint.
@@ -711,9 +708,7 @@ pub struct Page<T> {
 #[derive(Clone, Debug, Deserialize, Builder, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadonlyApiKeyResponse {
-    pub key: String,
-    #[serde(default)]
-    pub created_at: Option<DateTime<Utc>>,
+    pub api_key: String,
 }
 
 /// Cached V2 fee parameters keyed by token, sourced from `/clob-markets/{id}`'s `fd` field.

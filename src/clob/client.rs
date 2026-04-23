@@ -601,12 +601,11 @@ impl<S: State> Client<S> {
             token_id,
             FeeRateResponse {
                 base_fee: fee_rate_bps,
-                exponent: None,
             },
         );
     }
 
-    /// Pre-populates the fee rate cache for a token with both base fee and exponent.
+    /// Pre-populates the fee rate cache for a token.
     pub fn set_fee_rate(&self, token_id: U256, fee_rate: FeeRateResponse) {
         self.inner.fee_rate_bps.insert(token_id, fee_rate);
     }
@@ -1867,7 +1866,7 @@ impl<K: Kind> Client<Authenticated<K>> {
         let request = self
             .client()
             .request(Method::DELETE, format!("{}order", self.host()))
-            .json(&json!({ "orderId": order_id }))
+            .json(&json!({ "orderID": order_id }))
             .build()?;
         let headers = self.create_headers(&request).await?;
 
@@ -2292,7 +2291,13 @@ impl<K: Kind> Client<Authenticated<K>> {
     /// # Errors
     ///
     /// Returns an error if the request fails.
-    pub async fn readonly_api_keys(&self) -> Result<Vec<ReadonlyApiKeyResponse>> {
+    pub async fn readonly_api_keys(&self) -> Result<Vec<String>> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ReadonlyApiKeysBody {
+            readonly_api_keys: Vec<String>,
+        }
+
         let request = self
             .client()
             .request(
@@ -2302,7 +2307,9 @@ impl<K: Kind> Client<Authenticated<K>> {
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        crate::request(&self.inner.client, request, Some(headers)).await
+        let body: ReadonlyApiKeysBody =
+            crate::request(&self.inner.client, request, Some(headers)).await?;
+        Ok(body.readonly_api_keys)
     }
 
     /// Deletes a read-only API key.
