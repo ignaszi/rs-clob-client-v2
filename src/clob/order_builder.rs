@@ -385,7 +385,7 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
         let retry = self.clone();
         let order = self.build().await?;
         let signed = client.sign(signer, order).await?;
-        let result = client.post_order(signed).await;
+        let result = client.post_order(signed, None).await;
         if let Err(err) = &result {
             if let Some(status) = err.downcast_ref::<crate::error::Status>() {
                 if status
@@ -396,7 +396,7 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
                     if after_version != before_version {
                         let order = retry.build().await?;
                         let signed = client.sign(signer, order).await?;
-                        return client.post_order(signed).await;
+                        return client.post_order(signed, None).await;
                     }
                 }
             }
@@ -640,7 +640,7 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
         let retry = self.clone();
         let order = self.build().await?;
         let signed = client.sign(signer, order).await?;
-        let result = client.post_order(signed).await;
+        let result = client.post_order(signed, None).await;
         if let Err(err) = &result {
             if let Some(status) = err.downcast_ref::<crate::error::Status>() {
                 if status
@@ -651,7 +651,7 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
                     if after_version != before_version {
                         let order = retry.build().await?;
                         let signed = client.sign(signer, order).await?;
-                        return client.post_order(signed).await;
+                        return client.post_order(signed, None).await;
                     }
                 }
             }

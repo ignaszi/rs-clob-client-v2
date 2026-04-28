@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         .authenticate()
         .await?;
 
-    let resp = client.cancel_order(&order_id).await?;
+    let resp = client.cancel_order(&order_id, None).await?;
     if resp.canceled.iter().any(|id| id == &order_id) {
         println!("canceled: {order_id}");
     } else if let Some(reason) = resp.not_canceled.get(&order_id) {
