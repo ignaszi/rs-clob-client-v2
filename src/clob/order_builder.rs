@@ -41,6 +41,7 @@ pub struct OrderBuilder<OrderKind, K: AuthKind> {
     pub(crate) signer: Address,
     pub(crate) signature_type: SignatureType,
     pub(crate) salt_generator: fn() -> u64,
+    pub(crate) salt: Option<u64>,
     pub(crate) token_id: Option<U256>,
     pub(crate) price: Option<Decimal>,
     pub(crate) size: Option<Decimal>,
@@ -94,6 +95,13 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
     #[must_use]
     pub fn post_only(mut self, post_only: bool) -> Self {
         self.post_only = Some(post_only);
+        self
+    }
+
+    /// Sets an explicit salt. Pass `None` to use the random salt generator instead.
+    #[must_use]
+    pub fn salt(mut self, salt: Option<u64>) -> Self {
+        self.salt = salt;
         self
     }
 
@@ -194,28 +202,30 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
                     signatureType: self.signature_type as u8,
                 }))
             }
-            2 => {
-                let timestamp_ms = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("time went backwards")
-                    .as_millis();
-                Ok(OrderPayload::new(
-                    OrderV2 {
-                        salt: U256::from(salt),
-                        maker,
-                        signer,
-                        tokenId: token_id,
-                        makerAmount: U256::from(maker_amount),
-                        takerAmount: U256::from(taker_amount),
-                        side: side as u8,
-                        signatureType: self.signature_type as u8,
-                        timestamp: U256::from(timestamp_ms),
-                        metadata: self.metadata.unwrap_or(B256::ZERO),
-                        builder: self.builder_code.unwrap_or(B256::ZERO),
+            2 => Ok(OrderPayload::new(
+                OrderV2 {
+                    salt: U256::from(salt),
+                    maker,
+                    signer,
+                    tokenId: token_id,
+                    makerAmount: U256::from(maker_amount),
+                    takerAmount: U256::from(taker_amount),
+                    side: side as u8,
+                    signatureType: self.signature_type as u8,
+                    timestamp: if expiration != U256::ZERO {
+                        expiration * U256::from(1000u64)
+                    } else {
+                        let timestamp_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("time went backwards")
+                            .as_millis();
+                        U256::from(timestamp_ms)
                     },
-                    expiration,
-                ))
-            }
+                    metadata: self.metadata.unwrap_or(B256::ZERO),
+                    builder: self.builder_code.unwrap_or(B256::ZERO),
+                },
+                expiration,
+            )),
             other => Err(Error::validation(format!(
                 "unsupported CLOB protocol version: {other}"
             ))),
@@ -343,7 +353,7 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             side => return Err(Error::validation(format!("Invalid side: {side}"))),
         };
 
-        let salt = to_ieee_754_int((self.salt_generator)());
+        let salt = to_ieee_754_int(self.salt.unwrap_or_else(|| (self.salt_generator)()));
         let expiration_u256 = U256::from(expiration.timestamp().to_u64().ok_or(
             Error::validation(format!(
                 "Unable to represent expiration {expiration} as a u64"
@@ -386,18 +396,20 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
         let retry = self.clone();
         let order = self.build().await?;
         let signed = client.sign(signer, order).await?;
-        let result = client.post_order(signed).await;
-        if let Err(err) = &result
-            && let Some(status) = err.downcast_ref::<crate::error::Status>()
-            && status
-                .message
-                .contains(crate::clob::client::ORDER_VERSION_MISMATCH_ERROR)
-        {
-            let after_version = client.resolve_version(false).await.unwrap_or(0);
-            if after_version != before_version {
-                let order = retry.build().await?;
-                let signed = client.sign(signer, order).await?;
-                return client.post_order(signed).await;
+        let result = client.post_order(signed, None).await;
+        if let Err(err) = &result {
+            if let Some(status) = err.downcast_ref::<crate::error::Status>() {
+                if status
+                    .message
+                    .contains(crate::clob::client::ORDER_VERSION_MISMATCH_ERROR)
+                {
+                    let after_version = client.resolve_version(false).await.unwrap_or(0);
+                    if after_version != before_version {
+                        let order = retry.build().await?;
+                        let signed = client.sign(signer, order).await?;
+                        return client.post_order(signed, None).await;
+                    }
+                }
             }
         }
         result
@@ -601,7 +613,7 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             (side, _) => return Err(Error::validation(format!("Invalid side: {side}"))),
         };
 
-        let salt = to_ieee_754_int((self.salt_generator)());
+        let salt = to_ieee_754_int(self.salt.unwrap_or_else(|| (self.salt_generator)()));
 
         let payload = self
             .build_payload(
@@ -639,18 +651,20 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
         let retry = self.clone();
         let order = self.build().await?;
         let signed = client.sign(signer, order).await?;
-        let result = client.post_order(signed).await;
-        if let Err(err) = &result
-            && let Some(status) = err.downcast_ref::<crate::error::Status>()
-            && status
-                .message
-                .contains(crate::clob::client::ORDER_VERSION_MISMATCH_ERROR)
-        {
-            let after_version = client.resolve_version(false).await.unwrap_or(0);
-            if after_version != before_version {
-                let order = retry.build().await?;
-                let signed = client.sign(signer, order).await?;
-                return client.post_order(signed).await;
+        let result = client.post_order(signed, None).await;
+        if let Err(err) = &result {
+            if let Some(status) = err.downcast_ref::<crate::error::Status>() {
+                if status
+                    .message
+                    .contains(crate::clob::client::ORDER_VERSION_MISMATCH_ERROR)
+                {
+                    let after_version = client.resolve_version(false).await.unwrap_or(0);
+                    if after_version != before_version {
+                        let order = retry.build().await?;
+                        let signed = client.sign(signer, order).await?;
+                        return client.post_order(signed, None).await;
+                    }
+                }
             }
         }
         result

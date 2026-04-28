@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
         .build()
         .await?;
     let signed_order = client.sign(&signer, market_order).await?;
-    match client.post_order(signed_order).await {
+    match client.post_order(signed_order, None).await {
         Ok(r) => {
             info!(endpoint = "post_order", order_type = "market", order_id = %r.order_id, success = r.success);
         }
@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
         .build()
         .await?;
     let signed_order = client.sign(&signer, limit_order).await?;
-    match client.post_order(signed_order).await {
+    match client.post_order(signed_order, None).await {
         Ok(r) => {
             info!(endpoint = "post_order", order_type = "limit", order_id = %r.order_id, success = r.success);
         }
@@ -148,17 +148,17 @@ async fn main() -> anyhow::Result<()> {
         Err(e) => error!(endpoint = "orders", error = %e),
     }
 
-    match client.cancel_order(order_id).await {
+    match client.cancel_order(order_id, None).await {
         Ok(r) => info!(endpoint = "cancel_order", order_id = %order_id, result = ?r),
         Err(e) => error!(endpoint = "cancel_order", order_id = %order_id, error = %e),
     }
 
-    match client.cancel_orders(&[order_id]).await {
+    match client.cancel_orders(&[order_id], None).await {
         Ok(r) => info!(endpoint = "cancel_orders", result = ?r),
         Err(e) => error!(endpoint = "cancel_orders", error = %e),
     }
 
-    match client.cancel_all_orders().await {
+    match client.cancel_all_orders(None).await {
         Ok(r) => info!(endpoint = "cancel_all_orders", result = ?r),
         Err(e) => error!(endpoint = "cancel_all_orders", error = %e),
     }

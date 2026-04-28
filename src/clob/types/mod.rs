@@ -655,6 +655,7 @@ pub struct SignedOrder {
     pub owner: ApiKey,
     pub post_only: Option<bool>,
     pub defer_exec: Option<bool>,
+    pub order_id: String,
 }
 
 /// Signature material attached to a signed order.
@@ -1030,6 +1031,7 @@ mod tests {
             owner: ApiKey::nil(),
             post_only: None,
             defer_exec: None,
+            order_id: String::new(),
         };
 
         let value = to_value(&signed_order).expect("serialize SignedOrder");
@@ -1050,6 +1052,7 @@ mod tests {
             owner: ApiKey::nil(),
             post_only: None,
             defer_exec: Some(false),
+            order_id: String::new(),
         };
 
         let value = to_value(&signed_order).expect("serialize SignedOrder");

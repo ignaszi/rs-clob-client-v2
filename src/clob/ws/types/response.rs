@@ -6,10 +6,10 @@ use serde_with::{DefaultOnNull, DisplayFromStr, NoneAsEmptyString, serde_as};
 use tracing::warn;
 
 use crate::auth::ApiKey;
-use crate::clob::types::{OrderStatusType, Side, TraderSide};
+use crate::clob::types::{OrderStatusType, OrderType, Side, TraderSide};
 use crate::clob::ws::interest::MessageInterest;
 use crate::error::Kind;
-use crate::types::{B256, Decimal, U256};
+use crate::types::{Address, B256, Decimal, U256};
 
 /// Top-level WebSocket message wrapper.
 ///
@@ -297,6 +297,15 @@ pub struct MakerOrder {
     pub owner: ApiKey,
     /// Price of maker order
     pub price: Decimal,
+    /// Maker address
+    #[serde(default)]
+    pub maker_address: Option<Address>,
+    /// Fee rate in basis points
+    #[serde(default)]
+    pub fee_rate_bps: Option<Decimal>,
+    /// Side of the maker order
+    #[serde(default)]
+    pub side: Option<Side>,
 }
 
 #[non_exhaustive]
@@ -384,6 +393,13 @@ pub struct TradeMessage {
     /// Whether user was maker or taker
     #[serde(default)]
     pub trader_side: Option<TraderSide>,
+
+    #[serde(default)]
+    pub maker_address: Option<Address>,
+
+    /// Bucket index for the trade
+    #[serde(default)]
+    pub bucket_index: Option<u64>,
 }
 
 #[non_exhaustive]
@@ -442,6 +458,22 @@ pub struct OrderMessage {
     /// Order status
     #[serde(default)]
     pub status: Option<OrderStatusType>,
+
+    /// Unix timestamp of order creation
+    #[serde(default)]
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub created_at: Option<i64>,
+
+    #[serde(default)]
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    pub expiration: Option<i64>,
+
+    /// Order type (GTC, FOK, GTD, FAK)
+    #[serde(default)]
+    pub order_type: Option<OrderType>,
+
+    #[serde(default)]
+    pub maker_address: Option<Address>,
 }
 
 /// Order status for WebSocket order messages.
@@ -1223,5 +1255,37 @@ mod tests {
             }
             _ => panic!("Expected MarketResolved message"),
         }
+    }
+
+    #[test]
+    fn parse_order_message_with_all_fields() {
+        let json = r#"{
+            "event_type": "order",
+            "id": "0xff354cd7ca7539dfa9c28d90943ab5779a4eac34b9b37a757d7b32bdfb11790b",
+            "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+            "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+            "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+            "side": "SELL",
+            "order_owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+            "original_size": "10",
+            "size_matched": "0",
+            "price": "0.57",
+            "associate_trades": null,
+            "outcome": "YES",
+            "type": "PLACEMENT",
+            "created_at": "1672290687",
+            "expiration": "1234567",
+            "order_type": "GTD",
+            "status": "LIVE",
+            "maker_address": "0x4C9497941333332D29F1C235DD23200F3623fFaD",
+            "timestamp": "1672290687"
+        }"#;
+
+        let result: Result<WsMessage, _> = serde_json::from_str(json);
+        assert!(
+            result.is_ok(),
+            "Failed to parse order message: {:?}",
+            result.err()
+        );
     }
 }
