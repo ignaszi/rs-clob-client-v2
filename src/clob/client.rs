@@ -1700,7 +1700,7 @@ impl<K: Kind> Client<Authenticated<K>> {
         let config = contract_config(chain_id, neg_risk)
             .ok_or(Error::missing_contract_config(chain_id, neg_risk))?;
 
-        let signature = match &payload {
+        let (signature, order_id) = match &payload {
             OrderPayload::V2(p) => {
                 let exchange = config.exchange_v2.ok_or_else(|| {
                     Error::validation(format!(
@@ -1714,9 +1714,10 @@ impl<K: Kind> Client<Authenticated<K>> {
                     verifying_contract: Some(exchange),
                     ..Eip712Domain::default()
                 };
-                signer
-                    .sign_hash(&p.order.eip712_signing_hash(&domain))
-                    .await?
+                let order_hash = p.order.eip712_signing_hash(&domain);
+                let signature = signer.sign_hash(&order_hash).await?;
+                let order_id = format!("{order_hash:?}");
+                (signature, order_id)
             }
             OrderPayload::V1(p) => {
                 let domain = Eip712Domain {
@@ -1726,9 +1727,10 @@ impl<K: Kind> Client<Authenticated<K>> {
                     verifying_contract: Some(config.exchange),
                     ..Eip712Domain::default()
                 };
-                signer
-                    .sign_hash(&p.order.eip712_signing_hash(&domain))
-                    .await?
+                let order_hash = p.order.eip712_signing_hash(&domain);
+                let signature = signer.sign_hash(&order_hash).await?;
+                let order_id = format!("{order_hash:?}");
+                (signature, order_id)
             }
         };
 
@@ -1739,6 +1741,7 @@ impl<K: Kind> Client<Authenticated<K>> {
             owner: self.state().credentials.key,
             post_only,
             defer_exec,
+            order_id,
         })
     }
 
@@ -1755,15 +1758,19 @@ impl<K: Kind> Client<Authenticated<K>> {
     /// - The user has insufficient balance or allowance
     /// - The order price/size violates market rules
     /// - The request fails
-    pub async fn post_order(&self, order: SignedOrder) -> Result<PostOrderResponse> {
-        let request = self
-            .client()
+    pub async fn post_order(
+        &self,
+        order: SignedOrder,
+        client: Option<&ReqwestClient>,
+    ) -> Result<PostOrderResponse> {
+        let http = client.unwrap_or_else(|| self.client());
+        let request = http
             .request(Method::POST, format!("{}order", self.host()))
             .json(&order)
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        let result = crate::request(&self.inner.client, request, Some(headers)).await;
+        let result = crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await;
         self.invalidate_version_if_mismatch(&result).await;
         result
     }
@@ -1777,15 +1784,19 @@ impl<K: Kind> Client<Authenticated<K>> {
     /// # Errors
     ///
     /// Returns an error if any order fails validation or the request fails.
-    pub async fn post_orders(&self, orders: Vec<SignedOrder>) -> Result<Vec<PostOrderResponse>> {
-        let request = self
-            .client()
+    pub async fn post_orders(
+        &self,
+        orders: Vec<SignedOrder>,
+        client: Option<&ReqwestClient>,
+    ) -> Result<Vec<PostOrderResponse>> {
+        let http = client.unwrap_or_else(|| self.client());
+        let request = http
             .request(Method::POST, format!("{}orders", self.host()))
             .json(&orders)
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        let result = crate::request(&self.inner.client, request, Some(headers)).await;
+        let result = crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await;
         self.invalidate_version_if_mismatch(&result).await;
         result
     }
@@ -1844,15 +1855,19 @@ impl<K: Kind> Client<Authenticated<K>> {
     ///
     /// Returns an error if the order ID is invalid, the order doesn't exist,
     /// or the request fails.
-    pub async fn cancel_order(&self, order_id: &str) -> Result<CancelOrdersResponse> {
-        let request = self
-            .client()
+    pub async fn cancel_order(
+        &self,
+        order_id: &str,
+        client: Option<&ReqwestClient>,
+    ) -> Result<CancelOrdersResponse> {
+        let http = client.unwrap_or_else(|| self.client());
+        let request = http
             .request(Method::DELETE, format!("{}order", self.host()))
             .json(&json!({ "orderID": order_id }))
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        crate::request(&self.inner.client, request, Some(headers)).await
+        crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await
     }
 
     /// Cancels multiple orders by their order IDs in a single request.
@@ -1864,15 +1879,19 @@ impl<K: Kind> Client<Authenticated<K>> {
     /// # Errors
     ///
     /// Returns an error if any order ID is invalid or the request fails.
-    pub async fn cancel_orders(&self, order_ids: &[&str]) -> Result<CancelOrdersResponse> {
-        let request = self
-            .client()
+    pub async fn cancel_orders(
+        &self,
+        order_ids: &[&str],
+        client: Option<&ReqwestClient>,
+    ) -> Result<CancelOrdersResponse> {
+        let http = client.unwrap_or_else(|| self.client());
+        let request = http
             .request(Method::DELETE, format!("{}orders", self.host()))
             .json(&json!(order_ids))
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        crate::request(&self.inner.client, request, Some(headers)).await
+        crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await
     }
 
     /// Cancels all open orders for the authenticated user.
@@ -1883,14 +1902,17 @@ impl<K: Kind> Client<Authenticated<K>> {
     /// # Errors
     ///
     /// Returns an error if the request fails.
-    pub async fn cancel_all_orders(&self) -> Result<CancelOrdersResponse> {
-        let request = self
-            .client()
+    pub async fn cancel_all_orders(
+        &self,
+        client: Option<&ReqwestClient>,
+    ) -> Result<CancelOrdersResponse> {
+        let http = client.unwrap_or_else(|| self.client());
+        let request = http
             .request(Method::DELETE, format!("{}cancel-all", self.host()))
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        crate::request(&self.inner.client, request, Some(headers)).await
+        crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await
     }
 
     /// Attempts to cancel all open orders for a particular [`CancelMarketOrderRequest::market`]
@@ -1898,9 +1920,10 @@ impl<K: Kind> Client<Authenticated<K>> {
     pub async fn cancel_market_orders(
         &self,
         request: &CancelMarketOrderRequest,
+        client: Option<&ReqwestClient>,
     ) -> Result<CancelOrdersResponse> {
-        let request = self
-            .client()
+        let http = client.unwrap_or_else(|| self.client());
+        let request = http
             .request(
                 Method::DELETE,
                 format!("{}cancel-market-orders", self.host()),
@@ -1909,7 +1932,7 @@ impl<K: Kind> Client<Authenticated<K>> {
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        crate::request(&self.inner.client, request, Some(headers)).await
+        crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await
     }
 
     /// Retrieves a paginated list of trades for the authenticated user.
@@ -2796,6 +2819,7 @@ impl<K: Kind> Client<Authenticated<K>> {
             signature_type: self.inner.signature_type,
             funder: self.inner.funder,
             salt_generator: self.inner.salt_generator,
+            salt: None,
             token_id: None,
             price: None,
             size: None,

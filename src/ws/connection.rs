@@ -266,9 +266,7 @@ where
                                 }
                                 Err(e) => {
                                     #[cfg(feature = "tracing")]
-                                    tracing::warn!(%text, error = %e, "Failed to parse WebSocket message");
-                                    #[cfg(not(feature = "tracing"))]
-                                    let _: (&_, &_) = (&text, &e);
+                                    tracing::error!(%text, error = %e, "Failed to parse WebSocket message");
                                 }
                             }
                         }

@@ -41,6 +41,7 @@ pub struct OrderBuilder<OrderKind, K: AuthKind> {
     pub(crate) signer: Address,
     pub(crate) signature_type: SignatureType,
     pub(crate) salt_generator: fn() -> u64,
+    pub(crate) salt: Option<u64>,
     pub(crate) token_id: Option<U256>,
     pub(crate) price: Option<Decimal>,
     pub(crate) size: Option<Decimal>,
@@ -94,6 +95,13 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
     #[must_use]
     pub fn post_only(mut self, post_only: bool) -> Self {
         self.post_only = Some(post_only);
+        self
+    }
+
+    /// Sets an explicit salt. Pass `None` to use the random salt generator instead.
+    #[must_use]
+    pub fn salt(mut self, salt: Option<u64>) -> Self {
+        self.salt = salt;
         self
     }
 
@@ -334,7 +342,7 @@ impl<K: AuthKind> OrderBuilder<Limit, K> {
             side => return Err(Error::validation(format!("Invalid side: {side}"))),
         };
 
-        let salt = to_ieee_754_int((self.salt_generator)());
+        let salt = to_ieee_754_int(self.salt.unwrap_or_else(|| (self.salt_generator)()));
         let expiration_u256 = U256::from(expiration.timestamp().to_u64().ok_or(
             Error::validation(format!(
                 "Unable to represent expiration {expiration} as a u64"
@@ -594,7 +602,7 @@ impl<K: AuthKind> OrderBuilder<Market, K> {
             (side, _) => return Err(Error::validation(format!("Invalid side: {side}"))),
         };
 
-        let salt = to_ieee_754_int((self.salt_generator)());
+        let salt = to_ieee_754_int(self.salt.unwrap_or_else(|| (self.salt_generator)()));
 
         let payload = self
             .build_payload(
