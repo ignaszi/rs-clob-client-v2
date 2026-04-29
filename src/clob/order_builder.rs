@@ -193,28 +193,30 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
                     signatureType: self.signature_type as u8,
                 }))
             }
-            2 => {
-                let timestamp_ms = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("time went backwards")
-                    .as_millis();
-                Ok(OrderPayload::new(
-                    OrderV2 {
-                        salt: U256::from(salt),
-                        maker,
-                        signer: self.signer,
-                        tokenId: token_id,
-                        makerAmount: U256::from(maker_amount),
-                        takerAmount: U256::from(taker_amount),
-                        side: side as u8,
-                        signatureType: self.signature_type as u8,
-                        timestamp: U256::from(timestamp_ms),
-                        metadata: self.metadata.unwrap_or(B256::ZERO),
-                        builder: self.builder_code.unwrap_or(B256::ZERO),
+            2 => Ok(OrderPayload::new(
+                OrderV2 {
+                    salt: U256::from(salt),
+                    maker,
+                    signer: self.signer,
+                    tokenId: token_id,
+                    makerAmount: U256::from(maker_amount),
+                    takerAmount: U256::from(taker_amount),
+                    side: side as u8,
+                    signatureType: self.signature_type as u8,
+                    timestamp: if expiration != U256::ZERO {
+                        expiration * 1000
+                    } else {
+                        let timestamp_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("time went backwards")
+                            .as_millis();
+                        U256::from(timestamp_ms)
                     },
-                    expiration,
-                ))
-            }
+                    metadata: self.metadata.unwrap_or(B256::ZERO),
+                    builder: self.builder_code.unwrap_or(B256::ZERO),
+                },
+                expiration,
+            )),
             other => Err(Error::validation(format!(
                 "unsupported CLOB protocol version: {other}"
             ))),
