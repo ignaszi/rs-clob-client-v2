@@ -204,7 +204,7 @@ impl<OrderKind, K: AuthKind> OrderBuilder<OrderKind, K> {
                     side: side as u8,
                     signatureType: self.signature_type as u8,
                     timestamp: if expiration != U256::ZERO {
-                        expiration * 1000
+                        expiration * U256::from(1000u64)
                     } else {
                         let timestamp_ms = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
