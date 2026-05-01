@@ -48,7 +48,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polymarket_client_sdk_v2 = "0.5"
+polymarket_client_sdk_v2 = "0.6"
 ```
 
 or
@@ -83,7 +83,7 @@ Enable features in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-polymarket_client_sdk_v2 = { version = "0.5", features = ["ws", "data"] }
+polymarket_client_sdk_v2 = { version = "0.6", features = ["ws", "data"] }
 ```
 
 ## Re-exported Types
@@ -410,7 +410,7 @@ async fn main() -> anyhow::Result<()> {
 Real-time orderbook and user event streaming. Requires the `ws` feature.
 
 ```toml
-polymarket_client_sdk_v2 = { version = "0.5", features = ["ws"] }
+polymarket_client_sdk_v2 = { version = "0.6", features = ["ws"] }
 ```
 
 ```rust,ignore
