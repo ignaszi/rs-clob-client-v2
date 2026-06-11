@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, Ordering};
 #[cfg(feature = "heartbeats")]
 use std::time::Duration;
 
@@ -235,6 +235,7 @@ impl<S: Signer, K: Kind> AuthenticationBuilder<'_, S, K> {
                 funder,
                 signature_type: self.signature_type.unwrap_or(SignatureType::Eoa),
                 salt_generator: self.salt_generator.unwrap_or(generate_seed),
+                clock_sync: inner.clock_sync,
             }),
             #[cfg(feature = "heartbeats")]
             heartbeat_token: DroppingCancellationToken(None),
@@ -369,7 +370,10 @@ impl Default for Client<Unauthenticated> {
 #[derive(Clone, Debug, Builder)]
 pub struct Config {
     /// Whether the [`Client`] will use the server time provided by Polymarket when creating auth
-    /// headers. This adds another round trip to the requests.
+    /// headers. The server clock is tracked as a cached offset against the local clock and
+    /// refreshed at most every [`CLOCK_SYNC_TTL_MS`], so only the first request (and the
+    /// occasional refresh, performed in the background when an async-runtime feature such as
+    /// `ws` is enabled) pays a `/time` round trip.
     #[builder(default)]
     use_server_time: bool,
     /// Override for the geoblock API host. Defaults to `https://polymarket.com`.
@@ -399,6 +403,31 @@ impl Default for Config {
 
 /// The default geoblock API host (separate from CLOB host)
 const DEFAULT_GEOBLOCK_HOST: &str = "https://polymarket.com";
+
+/// How long a synced server-clock offset is used before it is refreshed.
+const CLOCK_SYNC_TTL_MS: i64 = 30_000;
+
+/// Cached offset between the CLOB server clock and the local clock, so that
+/// [`Config::use_server_time`] does not cost a `/time` round trip on every request.
+#[derive(Debug, Default)]
+struct ClockSync {
+    /// `server_time_ms - local_time_ms` measured at the last sync.
+    offset_ms: AtomicI64,
+    /// Local timestamp (ms) of the last successful sync. `0` means never synced.
+    synced_at_ms: AtomicI64,
+    /// Guards against concurrent refreshes.
+    refresh_inflight: AtomicBool,
+}
+
+impl ClockSync {
+    fn store_offset(&self, server_secs: Timestamp) {
+        let now_ms = Utc::now().timestamp_millis();
+        // `/time` has 1s resolution, so the offset carries a sub-second truncation bias.
+        self.offset_ms
+            .store(server_secs * 1000 - now_ms, Ordering::Release);
+        self.synced_at_ms.store(now_ms, Ordering::Release);
+    }
+}
 
 #[derive(Debug)]
 struct ClientInner<S: State> {
@@ -433,6 +462,9 @@ struct ClientInner<S: State> {
     signature_type: SignatureType,
     /// The salt/seed generator for use in creating [`SignableOrder`]s
     salt_generator: fn() -> u64,
+    /// Cached server-clock offset used by [`Self::cached_server_time`]. Shared via [`Arc`]
+    /// so background refresh tasks can outlive a borrow of the client.
+    clock_sync: Arc<ClockSync>,
 }
 
 impl<S: State> ClientInner<S> {
@@ -443,6 +475,74 @@ impl<S: State> ClientInner<S> {
             .build()?;
 
         crate::request(&self.client, request, None).await
+    }
+
+    /// Like [`Self::server_time`], but derived from a cached offset between the server clock
+    /// and the local clock. Only the first call blocks on a `/time` round trip; afterwards
+    /// the offset is refreshed at most every [`CLOCK_SYNC_TTL_MS`] — in a background task
+    /// when an async-runtime feature is enabled, inline otherwise.
+    pub async fn cached_server_time(&self) -> Result<Timestamp> {
+        if self.clock_sync.synced_at_ms.load(Ordering::Acquire) == 0 {
+            let server_secs = self.server_time().await?;
+            self.clock_sync.store_offset(server_secs);
+            return Ok(server_secs);
+        }
+
+        let now_ms = Utc::now().timestamp_millis();
+        if now_ms - self.clock_sync.synced_at_ms.load(Ordering::Acquire) > CLOCK_SYNC_TTL_MS {
+            self.refresh_clock_offset().await;
+        }
+
+        Ok((Utc::now().timestamp_millis() + self.clock_sync.offset_ms.load(Ordering::Acquire))
+            / 1000)
+    }
+
+    /// Refreshes the clock offset in the background; callers keep using the previous offset.
+    /// On failure, `synced_at_ms` is left stale so a later call retries.
+    #[cfg(any(feature = "ws", feature = "rtds", feature = "heartbeats"))]
+    async fn refresh_clock_offset(&self) {
+        if self
+            .clock_sync
+            .refresh_inflight
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return;
+        }
+        let client = self.client.clone();
+        let host = self.host.clone();
+        let clock_sync = Arc::clone(&self.clock_sync);
+        tokio::spawn(async move {
+            let result: Result<Timestamp> = async {
+                let request = client
+                    .request(Method::GET, format!("{host}time"))
+                    .build()?;
+                crate::request(&client, request, None).await
+            }
+            .await;
+            if let Ok(server_secs) = result {
+                clock_sync.store_offset(server_secs);
+            }
+            clock_sync.refresh_inflight.store(false, Ordering::Release);
+        });
+    }
+
+    /// Inline fallback when no async-runtime feature is enabled: the request that observes
+    /// an expired offset pays the `/time` round trip.
+    #[cfg(not(any(feature = "ws", feature = "rtds", feature = "heartbeats")))]
+    async fn refresh_clock_offset(&self) {
+        if self
+            .clock_sync
+            .refresh_inflight
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return;
+        }
+        if let Ok(server_secs) = self.server_time().await {
+            self.clock_sync.store_offset(server_secs);
+        }
+        self.clock_sync.refresh_inflight.store(false, Ordering::Release);
     }
 }
 
@@ -497,7 +597,7 @@ impl ClientInner<Unauthenticated> {
         ))?;
 
         let timestamp = if self.config.use_server_time {
-            self.server_time().await?
+            self.cached_server_time().await?
         } else {
             Utc::now().timestamp()
         };
@@ -1455,6 +1555,7 @@ impl Client<Unauthenticated> {
                 funder: None,
                 signature_type: SignatureType::Eoa,
                 salt_generator: generate_seed,
+                clock_sync: Arc::default(),
             }),
             #[cfg(feature = "heartbeats")]
             heartbeat_token: DroppingCancellationToken(None),
@@ -1571,6 +1672,7 @@ impl<K: Kind> Client<Authenticated<K>> {
                 funder: None,
                 signature_type: SignatureType::Eoa,
                 salt_generator: generate_seed,
+                clock_sync: inner.clock_sync,
             }),
             #[cfg(feature = "heartbeats")]
             heartbeat_token: DroppingCancellationToken(None),
@@ -2603,7 +2705,7 @@ impl<K: Kind> Client<Authenticated<K>> {
 
     async fn create_headers(&self, request: &Request) -> Result<HeaderMap> {
         let timestamp = if self.inner.config.use_server_time {
-            self.server_time().await?
+            self.inner.cached_server_time().await?
         } else {
             Utc::now().timestamp()
         };
