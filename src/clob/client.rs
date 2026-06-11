@@ -493,8 +493,10 @@ impl<S: State> ClientInner<S> {
             self.refresh_clock_offset().await;
         }
 
-        Ok((Utc::now().timestamp_millis() + self.clock_sync.offset_ms.load(Ordering::Acquire))
-            / 1000)
+        Ok(
+            (Utc::now().timestamp_millis() + self.clock_sync.offset_ms.load(Ordering::Acquire))
+                / 1000,
+        )
     }
 
     /// Refreshes the clock offset in the background; callers keep using the previous offset.
@@ -514,9 +516,7 @@ impl<S: State> ClientInner<S> {
         let clock_sync = Arc::clone(&self.clock_sync);
         tokio::spawn(async move {
             let result: Result<Timestamp> = async {
-                let request = client
-                    .request(Method::GET, format!("{host}time"))
-                    .build()?;
+                let request = client.request(Method::GET, format!("{host}time")).build()?;
                 crate::request(&client, request, None).await
             }
             .await;
@@ -542,7 +542,9 @@ impl<S: State> ClientInner<S> {
         if let Ok(server_secs) = self.server_time().await {
             self.clock_sync.store_offset(server_secs);
         }
-        self.clock_sync.refresh_inflight.store(false, Ordering::Release);
+        self.clock_sync
+            .refresh_inflight
+            .store(false, Ordering::Release);
     }
 }
 
@@ -1872,7 +1874,8 @@ impl<K: Kind> Client<Authenticated<K>> {
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        let result = crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await;
+        let result =
+            crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await;
         self.invalidate_version_if_mismatch(&result).await;
         result
     }
@@ -1898,7 +1901,8 @@ impl<K: Kind> Client<Authenticated<K>> {
             .build()?;
         let headers = self.create_headers(&request).await?;
 
-        let result = crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await;
+        let result =
+            crate::request(client.unwrap_or(&self.inner.client), request, Some(headers)).await;
         self.invalidate_version_if_mismatch(&result).await;
         result
     }
