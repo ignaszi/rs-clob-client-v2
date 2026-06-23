@@ -298,7 +298,7 @@ pub struct MakerOrder {
     pub owner: ApiKey,
     /// Price of maker order
     pub price: Decimal,
-    /// Maker address
+    /// Maker address (wallet address of the maker)
     #[serde(default)]
     pub maker_address: Option<Address>,
     /// Fee rate in basis points — Polymarket sends "" instead of null, so treat empty string as None
@@ -308,6 +308,9 @@ pub struct MakerOrder {
     /// Side of the maker order
     #[serde(default)]
     pub side: Option<Side>,
+    /// Outcome index (0 = first outcome, 1 = second, etc.) — not in official docs but present on wire
+    #[serde(default)]
+    pub outcome_index: Option<u32>,
 }
 
 #[non_exhaustive]
