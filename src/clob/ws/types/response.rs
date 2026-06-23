@@ -283,6 +283,7 @@ pub struct EventMessage {
 
 /// Maker order details within a trade message.
 #[non_exhaustive]
+#[serde_as]
 #[derive(Debug, Clone, Deserialize, Builder)]
 pub struct MakerOrder {
     /// Asset/token identifier of the maker order
@@ -300,7 +301,8 @@ pub struct MakerOrder {
     /// Maker address
     #[serde(default)]
     pub maker_address: Option<Address>,
-    /// Fee rate in basis points
+    /// Fee rate in basis points — Polymarket sends "" instead of null, so treat empty string as None
+    #[serde_as(as = "NoneAsEmptyString")]
     #[serde(default)]
     pub fee_rate_bps: Option<Decimal>,
     /// Side of the maker order
