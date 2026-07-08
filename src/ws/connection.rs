@@ -34,6 +34,8 @@ struct AbortOnDrop(tokio::task::AbortHandle);
 impl Drop for AbortOnDrop {
     fn drop(&mut self) {
         self.0.abort();
+        #[cfg(feature = "tracing")]
+        tracing::info!("ConnectionManager dropped — background connection task aborted");
     }
 }
 
