@@ -307,8 +307,9 @@ where
                 // Without this arm the loop would stay alive indefinitely: sender_rx.recv()
                 // returns None (arm disabled) but read.next() keeps firing via PING/PONG,
                 // so the else branch never triggers.
-                _ = sender_rx.is_closed() => {
-                    tracing::info!("Sender channel closed, stopping connection loop");
+                _ = sender_rx.closed() => {
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!("Sender channel closed, stopping connection loop");
                     break;
                 }
 
