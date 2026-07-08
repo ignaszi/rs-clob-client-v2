@@ -23,7 +23,6 @@ use crate::auth::Credentials;
 use crate::error::Kind;
 use crate::ws::WithCredentials;
 use crate::{Result, error::Error};
-
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 /// Broadcast channel capacity for incoming messages.
@@ -302,6 +301,15 @@ where
                     if write.send(Message::Text("PING".into())).await.is_err() {
                         break;
                     }
+                }
+
+                // Exit when the ConnectionManager is dropped (all sender_tx clones gone).
+                // Without this arm the loop would stay alive indefinitely: sender_rx.recv()
+                // returns None (arm disabled) but read.next() keeps firing via PING/PONG,
+                // so the else branch never triggers.
+                _ = sender_rx.is_closed() => {
+                    tracing::info!("Sender channel closed, stopping connection loop");
+                    break;
                 }
 
                 // Check if connection is still active
