@@ -618,10 +618,23 @@ impl<S: State> ClientInner<S> {
     }
 }
 
+/// Aborts a background task when dropped.
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 /// Resources for a WebSocket channel.
 struct ChannelResources {
     connection: ConnectionManager<WsMessage, Arc<InterestTracker>>,
     subscriptions: Arc<SubscriptionManager>,
+    /// Aborts the reconnection handler task when ChannelResources is dropped, which in turn
+    /// releases the Arc<SubscriptionManager> the task holds, dropping the second ConnectionManager
+    /// clone and allowing the connection loop task's AbortOnDrop to fire.
+    _reconnect_abort: AbortOnDrop,
 }
 
 impl ChannelResources {
@@ -630,11 +643,12 @@ impl ChannelResources {
         let connection = ConnectionManager::new(endpoint, config, Arc::clone(&interest))?;
         let subscriptions = Arc::new(SubscriptionManager::new(connection.clone(), interest));
 
-        subscriptions.start_reconnection_handler();
+        let reconnect_handle = subscriptions.start_reconnection_handler();
 
         Ok(Self {
             connection,
             subscriptions,
+            _reconnect_abort: AbortOnDrop(reconnect_handle.abort_handle()),
         })
     }
 
