@@ -25,6 +25,18 @@ use crate::ws::WithCredentials;
 use crate::{Result, error::Error};
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
+/// Aborts the background connection task when the last [`ConnectionManager`] clone is dropped.
+///
+/// `ConnectionManager` is `Clone`, so the handle is wrapped in `Arc`: only the final
+/// `drop` (strong-count → 0) triggers the abort.
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 /// Broadcast channel capacity for incoming messages.
 const BROADCAST_CAPACITY: usize = 1024;
 
@@ -101,6 +113,8 @@ where
     broadcast_tx: broadcast::Sender<M>,
     /// Phantom data for unused type parameters
     _phantom: PhantomData<P>,
+    /// Aborts the background task when the last ConnectionManager clone is dropped.
+    _abort_on_drop: std::sync::Arc<AbortOnDrop>,
 }
 
 impl<M, P> ConnectionManager<M, P>
@@ -124,7 +138,7 @@ where
         let broadcast_tx_clone = broadcast_tx.clone();
         let state_tx_clone = state_tx.clone();
 
-        tokio::spawn(async move {
+        let join_handle = tokio::spawn(async move {
             Self::connection_loop(
                 connection_endpoint,
                 connection_config,
@@ -135,6 +149,9 @@ where
             )
             .await;
         });
+        let abort_handle = join_handle.abort_handle();
+        // Detach the JoinHandle — lifetime is managed via AbortOnDrop instead.
+        drop(join_handle);
 
         Ok(Self {
             state_tx,
@@ -142,6 +159,7 @@ where
             sender_tx,
             broadcast_tx,
             _phantom: PhantomData,
+            _abort_on_drop: std::sync::Arc::new(AbortOnDrop(abort_handle)),
         })
     }
 
@@ -301,16 +319,6 @@ where
                     if write.send(Message::Text("PING".into())).await.is_err() {
                         break;
                     }
-                }
-
-                // Exit when the ConnectionManager is dropped (all sender_tx clones gone).
-                // Without this arm the loop would stay alive indefinitely: sender_rx.recv()
-                // returns None (arm disabled) but read.next() keeps firing via PING/PONG,
-                // so the else branch never triggers.
-                _ = sender_rx.closed() => {
-                    #[cfg(feature = "tracing")]
-                    tracing::debug!("Sender channel closed, stopping connection loop");
-                    break;
                 }
 
                 // Check if connection is still active
